@@ -51,15 +51,20 @@ export const VIEWS_CSS = `
 .study-tile.active { background: var(--study-tile-color, var(--accent-color)); border-color: var(--study-tile-color, var(--accent-color)); color: var(--study-tile-on, var(--title-color)); }
 .study-tile.active .study-tile-icon, .study-tile.active .study-tile-count { color: inherit; }
 .study-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 6px 12px; }
-.study-page .study-list { padding: 0; }
+.study-page .study-list, .study-panel .study-list { padding: 0; }
 .study-page-inner { max-width: 1240px; margin: 0 auto; padding: 18px 24px 36px; }
 .study-note { padding: 8px 10px; color: var(--text-secondary); font-size: var(--small-font-size); }
 .study-page .study-note { padding: 8px 2px; }
 .study-note.error { color: var(--tint-red-text, var(--text-secondary)); }
 .study-campus { padding: 10px 8px 2px; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
-.study-place { display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: baseline; gap: 1px 8px; width: 100%; box-sizing: border-box; padding: 6px 8px; border: 0; border-radius: var(--radius-sm, 4px); background: transparent; color: var(--text-color); font: inherit; text-align: left; cursor: pointer; }
-.study-place + .study-place { margin-top: 1px; }
-.study-place:hover { background: var(--hover-bg); }
+/* Place rows follow Email's message list (full width, no inset or rounding, a hairline between rows) and Contacts' selection (accent tint, accent name). */
+.study-place { display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: baseline; gap: 2px 8px; width: 100%; box-sizing: border-box; margin: 0; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--border-light); border-radius: 0; background: transparent; color: var(--text-color); font: inherit; text-align: left; cursor: pointer; transition: background-color 120ms ease-out; }
+.study-place:hover { background: color-mix(in srgb, var(--title-color) 5%, transparent); }
+.study-place.active { background: var(--accent-tint-bg); }
+.study-place.active .study-place-name { color: var(--accent-color); }
+@media (prefers-reduced-motion: reduce) { .study-place { transition: none; } }
+.study-panel .study-note { padding: 10px 12px; }
+.study-panel .study-credit { padding: 10px 12px 12px; }
 .study-place-name { min-width: 0; color: var(--title-color); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .study-place-count { color: var(--text-secondary); font-size: var(--small-font-size); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .study-place-count.pending { color: var(--text-tertiary, var(--text-secondary)); }
@@ -419,11 +424,19 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     }))
   }
 
-  function PlaceRow({ location, preferences, count, refresh }: { location: Location; preferences: Preferences; count: number; refresh: () => void }): Node {
+  /** The `instanceId` of this plugin's page in the focused workspace tab, followed live. */
+  function useActiveInstance(): string | undefined {
+    const read = () => { const tab = api.getState().activePluginTab; return tab?.pluginId === api.pluginId ? tab.instanceId : undefined }
+    const [instance, setInstance] = React.useState(read)
+    React.useEffect(() => api.subscribe(() => setInstance(read())), [])
+    return instance
+  }
+
+  function PlaceRow({ location, preferences, count, active, refresh }: { location: Location; preferences: Preferences; count: number; active: boolean; refresh: () => void }): Node {
     const opening = h(OpeningLabel, { location, date: preferences.date, service: preferences.service })
     const place = where(location)
     return h('button', {
-      type: 'button', className: 'study-place', 'data-place': location.id,
+      type: 'button', className: `study-place${active ? ' active' : ''}`, 'data-place': location.id, 'aria-current': active ? 'page' : undefined,
       onClick: (event: MouseEvent) => openPlace(location, api.ui.hasModKey(event)),
       onAuxClick: (event: MouseEvent) => { if (event.button === 1) { event.preventDefault(); openPlace(location, true) } },
       onContextMenu: (event: MouseEvent) => void placeMenu(event, location, refresh)
@@ -434,9 +447,10 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
   }
 
   function PlaceList({ places, campus, preferences, refresh }: { places: Places; campus: Campus; preferences: Preferences; refresh: () => void }): Node {
+    const open = useActiveInstance()
     if (places.error[campus]) return h('div', { className: 'study-note error', role: 'alert' }, places.error[campus])
     const listed = places.byCampus[campus].filter(location => places.count(location) > 0)
-    const rows = listed.map(location => h(PlaceRow, { key: location.id, location, preferences, count: places.count(location), refresh }))
+    const rows = listed.map(location => h(PlaceRow, { key: location.id, location, preferences, count: places.count(location), active: open === placeInstance(location.id), refresh }))
     const note = places.pending[campus] ? t(campus === 'uzh' ? 'loading.uzh' : 'loading')
       : listed.length ? '' : places.byCampus[campus].length ? t('empty.filtered') : t(`empty.${preferences.service}`)
     return h(React.Fragment, null, ...rows, note ? h('div', { className: 'study-note' }, note) : null)

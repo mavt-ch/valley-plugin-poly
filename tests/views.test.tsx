@@ -113,6 +113,27 @@ describe('menu plan panel', () => {
     expect(place(container, 'eth:1')!.textContent).toBe('Test Hall1 menuHXX E 1 · Open now · 11:00–20:00')
   })
 
+  it('marks the place whose page is the focused tab', async () => {
+    const { api } = harness()
+    const listeners = new Set<() => void>()
+    let state = { ...api.getState(), activePluginTab: null as null | { pluginId: string; instanceId?: string } }
+    api.getState = (() => state) as typeof api.getState
+    api.subscribe = ((listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener) }) as typeof api.subscribe
+    cleanup()
+    render(api.React.createElement((api.registerView as unknown as { mock: { calls: [string, ComponentType][] } }).mock.calls.find(([key]) => key === 'study.panel')![1]))
+    await settle()
+    expect(document.querySelector('[data-place="eth:1"]')).not.toBeNull()
+    expect(document.querySelector('.study-place.active')).toBeNull()
+    state = { ...state, activePluginTab: { pluginId: api.pluginId, instanceId: 'place:eth:1' } }
+    act(() => { for (const listener of listeners) listener() })
+    const hall = document.querySelector('[data-place="eth:1"]')!
+    expect(hall.className).toBe('study-place active')
+    expect(hall.getAttribute('aria-current')).toBe('page')
+    state = { ...state, activePluginTab: { pluginId: 'other', instanceId: 'place:eth:1' } }
+    act(() => { for (const listener of listeners) listener() })
+    expect(document.querySelector('.study-place.active')).toBeNull()
+  })
+
   it('opens a place’s page, in a new tab with ⌘ or the middle button', async () => {
     const { container, openMainTab, setMod } = harness()
     await settle()
