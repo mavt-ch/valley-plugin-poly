@@ -113,6 +113,36 @@ describe('menu plan panel', () => {
     expect(place(container, 'eth:1')!.textContent).toBe('Test Hall1 menuHXX E 1 · Open now · 11:00–20:00')
   })
 
+  it('stars places, shows Favorites first and lists every favorite across campuses', async () => {
+    const { settings, container } = harness()
+    await settle()
+    expect(screen.queryByRole('button', { name: /^Favorite places/ })).toBeNull()
+    const star = screen.getByRole('button', { name: 'Add Test Hall to favorites' })
+    expect(star.closest('.study-place-item')!.querySelector('[data-place="eth:1"]')).not.toBeNull()
+    fireEvent.click(star)
+    expect(settings.favorites).toEqual(['eth:1'])
+    const starred = screen.getByRole('button', { name: 'Remove Test Hall from favorites' })
+    expect(starred.className).toBe('study-star on')
+    expect(starred.getAttribute('aria-pressed')).toBe('true')
+    const favorites = tile(/^Favorite places/)
+    expect(favorites.parentElement!.firstElementChild).toBe(favorites)
+    expect(favorites.textContent).toBe('Favorites1')
+    fireEvent.click(tile(/^UZH outlets/))
+    fireEvent.click(screen.getByRole('button', { name: 'Add Obere Mensa to favorites' }))
+    expect(settings.favorites).toEqual(['eth:1', `uzh:${MENSA}`])
+    fireEvent.click(favorites)
+    expect(settings.campus).toBe('favorites')
+    expect([...container.querySelectorAll('.study-place')].map(row => row.textContent)).toEqual([
+      'Obere Mensa2 menusCampus Zentrum · Teststrasse 1',
+      'Test Hall2 menusHöngg · HXX E 1 · Open now · 11:00–20:00'
+    ])
+    expect(screen.getByText('Menus from ETH Zurich Gastronomy and from the ZFV on food2050.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Next day' }))
+    await settle()
+    expect(screen.getByText('None of your favorite places has a menu for this meal on this day.')).toBeTruthy()
+    expect(tile(/^Favorite places/).textContent).toBe('Favorites0')
+  })
+
   it('marks the place whose page is the focused tab', async () => {
     const { api } = harness()
     const listeners = new Set<() => void>()
@@ -242,7 +272,7 @@ describe('menu plan page', () => {
     const head = container.querySelector('.study-page-head')!
     expect(head.querySelector('h1')!.textContent).toBe('Test Hall')
     expect(head.textContent).toBe('Test Hall')
-    expect(head.querySelectorAll('button')).toHaveLength(1)
+    expect([...head.querySelectorAll('button')].map(button => button.getAttribute('aria-label'))).toEqual(['Add Test Hall to favorites', 'Refresh'])
     expect(screen.getAllByRole('heading')).toHaveLength(1)
     const facts = container.querySelector('.study-page > .study-bar.study-facts')!
     expect(facts.textContent).toBe('HXX E 1Open now · 11:00–20:00Lunch 11:00–13:302 menus')
@@ -262,6 +292,15 @@ describe('menu plan page', () => {
     expect(price.getAttribute('title')).toBe('Students CHF 7.50 · Staff CHF 10.50 · Guests CHF 13.50')
     expect(bratwurst.querySelector('.study-dish-allergens')!.textContent).toBe('Allergens: gluten wheat, celery')
     expect(screen.getAllByText('Lactose-free')).toHaveLength(2)
+  })
+
+  it('stars the place from its page bar', async () => {
+    const { settings } = harness({ favorites: ['eth:2'] }, 'study.page', { instanceId: 'place:eth:1' })
+    await settle()
+    fireEvent.click(screen.getByRole('button', { name: 'Add Test Hall to favorites' }))
+    expect(settings.favorites).toEqual(['eth:2', 'eth:1'])
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Test Hall from favorites' }))
+    expect(settings.favorites).toEqual(['eth:2'])
   })
 
   it('follows the filters', async () => {

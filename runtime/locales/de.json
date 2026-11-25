@@ -63,7 +63,7 @@
   "settings.onlyGlutenFree.title": "Nur glutenfrei",
   "settings.onlyGlutenFree.description": "Nur Menüs zeigen, deren angegebene Allergene kein glutenhaltiges Getreide enthalten. Ein Menü ohne angegebene Allergene wird nicht gezeigt.",
   "settings.campus.title": "Campus",
-  "settings.campus.description": "Der im Menüplan gewählte Campus.",
+  "settings.campus.description": "Der im Menüplan gewählte Tag: Favoriten oder ein Campus.",
   "settings.day.title": "Tag",
   "settings.day.description": "Tag und Mahlzeit, die der Menüplan zeigt; ein vergangener Tag wird zu heute.",
   "price.internalStudents": "Mitarbeitende & Studierende",
@@ -74,5 +74,13 @@
   "prices": "Preise",
   "prices.all": "Alle Preise",
   "settings.prices.title": "Angezeigte Preise",
-  "settings.prices.description": "Welche Preise die Menükarten zeigen: alle, von Studierenden bis Gäste, oder die einer Gruppe."
+  "settings.prices.description": "Welche Preise die Menükarten zeigen: alle, von Studierenden bis Gäste, oder die einer Gruppe.",
+  "campus.favorites": "Favoriten",
+  "campus.favorites.title": "Lieblingsorte",
+  "favorite.add": "{name} zu den Favoriten hinzufügen",
+  "favorite.remove": "{name} aus den Favoriten entfernen",
+  "empty.favorites": "Keiner deiner Lieblingsorte hat an diesem Tag ein Menü für diese Mahlzeit.",
+  "credit.both": "Menüs von ETH Zürich Gastronomie und vom ZFV auf food2050.",
+  "settings.favorites.title": "Lieblingsorte",
+  "settings.favorites.description": "Die im Menüplan mit einem Stern markierten Orte."
 }

@@ -40,10 +40,10 @@ export const VIEWS_CSS = `
 .study-icon-btn.spinning svg { animation: study-spin 0.9s linear infinite; }
 @keyframes study-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .study-icon-btn.spinning svg { animation: none; } }
-/* Campus tags: To-Do's smart-list chips (icon tinted in the tag's colour, filled when active). */
+/* Campus tags: To-Do's smart-list chips (icon tinted in the tag's colour, filled when active) with the 6px corners of Contacts' group tags. */
 .study-tiles { gap: 4px; padding: 0 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
 .study-tiles::-webkit-scrollbar { display: none; }
-.study-tile { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; box-sizing: border-box; height: 28px; padding: 0 10px; border: 1px solid var(--border-light); border-radius: 999px; background: var(--surface-color-alt); color: var(--text-secondary); font-family: var(--interface-font); font-size: var(--small-font-size); line-height: 1; cursor: pointer; }
+.study-tile { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; box-sizing: border-box; height: 28px; padding: 0 10px; border: 1px solid var(--border-light); border-radius: 6px; background: var(--surface-color-alt); color: var(--text-secondary); font-family: var(--interface-font); font-size: var(--small-font-size); line-height: 1; cursor: pointer; }
 .study-tile:hover { background: var(--hover-bg); color: var(--text-color); }
 .study-tile-icon { display: grid; place-items: center; width: 15px; height: 15px; flex-shrink: 0; color: var(--study-tile-color, var(--text-tertiary)); }
 .study-tile-icon svg { width: 15px; height: 15px; }
@@ -60,6 +60,16 @@ export const VIEWS_CSS = `
 /* Place rows follow Email's message list (full width, no inset or rounding, a hairline between rows) and Contacts' selection (accent tint, accent name). */
 .study-place { display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: baseline; gap: 2px 8px; width: 100%; box-sizing: border-box; margin: 0; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--border-light); border-radius: 0; background: transparent; color: var(--text-color); font: inherit; text-align: left; cursor: pointer; transition: background-color 120ms ease-out; }
 .study-place:hover { background: color-mix(in srgb, var(--title-color) 5%, transparent); }
+/* Each row carries a favourite star at its right edge, outside the row button; filled yellow when it is a favourite. */
+.study-place-item { position: relative; }
+.study-place-item .study-place { padding-right: 38px; }
+.study-place-item > .study-star { position: absolute; top: 8px; right: 8px; }
+.study-star { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: var(--shell-control-toolbar, 24px); height: var(--shell-control-toolbar, 24px); padding: 0; border: 0; border-radius: var(--shell-control-radius, 4px); background: transparent; color: var(--text-tertiary, var(--text-secondary)); cursor: pointer; }
+.study-star:hover { background: var(--hover-bg); color: var(--text-color); }
+.study-star svg { width: 15px; height: 15px; }
+.study-star.on, .study-star.on:hover { color: var(--color-yellow, #e5b33a); }
+.study-star.on svg { fill: currentColor; }
+.study-star:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -2px; }
 .study-place.active { background: var(--accent-tint-bg); }
 .study-place.active .study-place-name { color: var(--accent-color); }
 @media (prefers-reduced-motion: reduce) { .study-place { transition: none; } }
@@ -74,6 +84,7 @@ export const VIEWS_CSS = `
 /* The page's first bar names the place (or the campus) only; day, meal and filters live in the sidebar. */
 .study-page-title { flex: 1; min-width: 0; margin: 0; color: var(--title-color); font-size: var(--normal-font-size, 1rem); font-weight: 600; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .study-page-head .study-bar-balance { width: var(--shell-control-toolbar, 24px); flex-shrink: 0; }
+.study-page-head .study-bar-balance.double { width: calc(var(--shell-control-toolbar, 24px) * 2 + 8px); }
 /* A place's facts: a fixed, centred second bar (37px + 1px line) that never scrolls or wraps; the location gives way first. */
 .study-page .study-bar.study-facts { padding: 0; overflow: hidden; }
 .study-facts-inner { display: flex; align-items: center; justify-content: center; gap: 14px; width: 100%; padding: 0 24px; box-sizing: border-box; overflow: hidden; white-space: nowrap; color: var(--text-secondary); font-size: var(--small-font-size); }
@@ -126,13 +137,22 @@ const TAB: Shapes = ['M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2
 const DISH: Shapes = ['M6 3v7a2 2 0 0 0 2 2a2 2 0 0 0 2-2V3', 'M8 3v18', 'M17 21V3c-2.2 1.2-3.5 3.8-3.5 7.2V13a1 1 0 0 0 1 1H17']
 const FILTER: Shapes = ['M4 5h16l-6 7.5V19l-4 1.5v-8z']
 const CASH: Shapes = ['M3 7a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z', 'M9.5 12a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0', 'M6 9.5v.01', 'M18 14.5v.01']
-/** ETH Zentrum: the main building's columns; Höngg: the hill; UZH: a book. */
+/**
+ * ETH Zentrum: the main building seen from the Polyterrasse (long wings, the raised centre with its
+ * two columns, arched door and flagpole); Höngg: the hill; UZH: the main building's round tower with
+ * its dome and door between the hipped wings. Drawn sparse so they stay legible at 15px.
+ */
 const CAMPUS_ICONS: Record<Campus, Shapes> = {
-  eth: ['M3 21h18', 'M4 10h16', 'M12 3l8 5H4z', 'M6 10v8', 'M10 10v8', 'M14 10v8', 'M18 10v8', 'M4 18h16'],
+  eth: ['M2 20h20', 'M3 20v-7h5', 'M16 13h5v7', 'M8 20V8h8v12', 'M7 8h10', 'M12 8V4', 'M10.5 10.5V14', 'M13.5 10.5V14', 'M10.5 20v-2.5a1.5 1.5 0 0 1 3 0V20', 'M5.5 16.5h.01', 'M18.5 16.5h.01'],
   hoengg: ['M3 19h18', 'M3 19l6-9 4 5 3-3 5 7', 'M15 6.5a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0'],
-  uzh: ['M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z', 'M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z']
+  uzh: ['M2 20h20', 'M3 20v-6l1.5-2h4', 'M15.5 12h4l1.5 2v6', 'M8.5 20v-9h7v9', 'M8.5 11a3.5 3.5 0 0 1 7 0', 'M12 7.5V6', 'M10.5 20v-2.5a1.5 1.5 0 0 1 3 0V20', 'M5.5 16.5h.01', 'M18.5 16.5h.01']
 }
-const CAMPUS_COLORS: Record<Campus, string> = { eth: 'palette:primary-blue', hoengg: 'palette:green', uzh: 'palette:violet' }
+const STAR: Shapes = ['M12 3.6l2.6 5.25 5.8.85-4.2 4.1 1 5.8L12 16.85 6.8 19.6l1-5.8-4.2-4.1 5.8-.85z']
+/** The tags of row 2: Favorites first (shown once a place is starred), then the campuses. */
+type Tag = 'favorites' | Campus
+const TAGS: Tag[] = ['favorites', ...CAMPUSES]
+const TAG_ICONS: Record<Tag, Shapes> = { favorites: STAR, ...CAMPUS_ICONS }
+const TAG_COLORS: Record<Tag, string> = { favorites: 'palette:yellow', eth: 'palette:primary-blue', hoengg: 'palette:green', uzh: 'palette:violet' }
 /** The diet filters in the menu's two groups: what the dish is, then what it leaves out. */
 /** Whose prices the cards show: every price, or one group's. */
 type PriceShown = 'all' | PriceGroup
@@ -151,6 +171,7 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     ...shapes.map(d => h('path', { key: d, d })))
   const problem = (error: unknown) => { const key = `error.${error instanceof Error ? error.message : ''}`; return t(key) === key ? t('error.serviceError') : t(key) }
   const fill = (template: string, values: Record<string, string | number>) => Object.entries(values).reduce((text, [name, value]) => text.replace(`{${name}}`, String(value)), template)
+  const strings = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
   const menusLabel = (count: number) => count === 1 ? t('menus.one') : fill(t('menus.other'), { count })
 
   /** The shared day: a stored day before today falls back to today and the meal of the hour. */
@@ -172,7 +193,8 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     return {
       language: sourceLanguage(api.ui.language()),
       locale: api.ui.language() || 'en',
-      campus: (CAMPUSES.includes(settings.campus as Campus) ? settings.campus : 'hoengg') as Campus,
+      campus: (TAGS.includes(settings.campus as Tag) ? settings.campus : 'hoengg') as Tag,
+      favorites: strings(settings.favorites),
       prices: (PRICE_CHOICES.includes(settings.prices as PriceShown) ? settings.prices : 'all') as PriceShown,
       filters: { vegetarian: settings.onlyVegetarian === true, vegan: settings.onlyVegan === true, glutenFree: settings.onlyGlutenFree === true, lactoseFree: settings.onlyLactoseFree === true } as Filters,
       ...dayOf(settings.day)
@@ -393,32 +415,38 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     const serving = (location: Location) => Boolean(menuOf(location, date, service))
     const ethPlaces = (eth.data ?? []).filter(serving).sort((a, b) => a.name.localeCompare(b.name, preferences.locale))
     const uzhPlaces = (uzh.outlets.data ?? []).flatMap(outlet => { const week = uzh.byPath.get(outlet.path)?.data; return week && serving(week) ? [week] : [] })
-    const byCampus: Record<Campus, Location[]> = { eth: ethPlaces.filter(row => row.campus === 'eth'), hoengg: ethPlaces.filter(row => row.campus === 'hoengg'), uzh: uzhPlaces }
+    const favorites = [...ethPlaces, ...uzhPlaces].filter(row => preferences.favorites.includes(row.id)).sort((a, b) => a.name.localeCompare(b.name, preferences.locale))
+    const byTag: Record<Tag, Location[]> = { favorites, eth: ethPlaces.filter(row => row.campus === 'eth'), hoengg: ethPlaces.filter(row => row.campus === 'hoengg'), uzh: uzhPlaces }
     const count = (location: Location) => dishesOf(location, date, service, filters).length
-    const pending: Record<Campus, boolean> = { eth: eth.loading && !eth.data, hoengg: eth.loading && !eth.data, uzh: uzh.pending }
-    const error: Record<Campus, string> = { eth: eth.error, hoengg: eth.error, uzh: uzh.outlets.error }
-    return { byCampus, count, pending, error }
+    const ethPending = eth.loading && !eth.data
+    const pending: Record<Tag, boolean> = { favorites: ethPending || uzh.pending, eth: ethPending, hoengg: ethPending, uzh: uzh.pending }
+    /** Favorites list what has loaded; an unreachable service shows on its own campus tag. */
+    const error: Record<Tag, string> = { favorites: '', eth: eth.error, hoengg: eth.error, uzh: uzh.outlets.error }
+    return { byTag, count, pending, error, hasFavorites: preferences.favorites.length > 0 }
   }
   type Places = ReturnType<typeof usePlaces>
 
-  /** The tags shown: those with places that day, else the chosen one alone; the active tag is the chosen one when shown. */
-  function campusTags(places: Places, chosen: Campus) {
-    const shown = CAMPUSES.filter(campus => places.pending[campus] || places.byCampus[campus].length > 0)
+  /**
+   * The tags shown: Favorites while any place is starred, each campus while it has places serving the
+   * meal that day, else the chosen one alone; the active tag is the chosen one when shown.
+   */
+  function campusTags(places: Places, chosen: Tag) {
+    const shown = TAGS.filter(tag => tag === 'favorites' ? places.hasFavorites : places.pending[tag] || places.byTag[tag].length > 0)
     const visible = shown.length ? shown : [chosen]
     return { visible, active: visible.includes(chosen) ? chosen : visible[0] }
   }
 
-  function Tiles({ places, visible, active }: { places: Places; visible: Campus[]; active: Campus }): Node {
+  function Tiles({ places, visible, active }: { places: Places; visible: Tag[]; active: Tag }): Node {
     return h('nav', { className: 'study-bar study-tiles', 'aria-label': t('campus.label') }, visible.map(campus => {
-      const count = places.byCampus[campus].filter(location => places.count(location) > 0).length
+      const count = places.byTag[campus].filter(location => places.count(location) > 0).length
       const label = t(`campus.${campus}`)
       return h('button', {
         key: campus, type: 'button', className: `study-tile${campus === active ? ' active' : ''}`, 'aria-pressed': campus === active,
         title: t(`campus.${campus}.title`), 'aria-label': `${t(`campus.${campus}.title`)} ${count}`,
-        style: { '--study-tile-color': paletteCssValue(CAMPUS_COLORS[campus]), '--study-tile-on': paletteCssContrast(CAMPUS_COLORS[campus]) } as Record<string, string>,
+        style: { '--study-tile-color': paletteCssValue(TAG_COLORS[campus]), '--study-tile-on': paletteCssContrast(TAG_COLORS[campus]) } as Record<string, string>,
         onClick: () => void api.settings.set('campus', campus)
       },
-      h('span', { className: 'study-tile-icon' }, h(Icon, { shapes: CAMPUS_ICONS[campus] })),
+      h('span', { className: 'study-tile-icon' }, h(Icon, { shapes: TAG_ICONS[campus] })),
       h('span', null, label),
       h('span', { className: 'study-tile-count' }, places.pending[campus] && !count ? '…' : String(count)))
     }))
@@ -432,10 +460,20 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     return instance
   }
 
-  function PlaceRow({ location, preferences, count, active, refresh }: { location: Location; preferences: Preferences; count: number; active: boolean; refresh: () => void }): Node {
+  const toggleFavorite = (preferences: Preferences, id: string) => void api.settings.set('favorites',
+    preferences.favorites.includes(id) ? preferences.favorites.filter(item => item !== id) : [...preferences.favorites, id].slice(-200))
+
+  /** The favourite star of a place: outlined, filled yellow while the place is a favourite. */
+  function Star({ location, preferences }: { location: Location; preferences: Preferences }): Node {
+    const on = preferences.favorites.includes(location.id)
+    const label = fill(t(on ? 'favorite.remove' : 'favorite.add'), { name: location.name })
+    return h('button', { type: 'button', className: `study-star${on ? ' on' : ''}`, 'aria-pressed': on, title: label, 'aria-label': label, onClick: () => toggleFavorite(preferences, location.id) }, h(Icon, { shapes: STAR }))
+  }
+
+  function PlaceRow({ location, preferences, count, active, tag, refresh }: { location: Location; preferences: Preferences; count: number; active: boolean; tag: Tag; refresh: () => void }): Node {
     const opening = h(OpeningLabel, { location, date: preferences.date, service: preferences.service })
-    const place = where(location)
-    return h('button', {
+    const place = [tag === 'favorites' && location.source === 'eth' ? t(`campus.${location.campus}`) : '', where(location)].filter(Boolean).join(' · ')
+    return h('div', { className: 'study-place-item' }, h('button', {
       type: 'button', className: `study-place${active ? ' active' : ''}`, 'data-place': location.id, 'aria-current': active ? 'page' : undefined,
       onClick: (event: MouseEvent) => openPlace(location, api.ui.hasModKey(event)),
       onAuxClick: (event: MouseEvent) => { if (event.button === 1) { event.preventDefault(); openPlace(location, true) } },
@@ -443,16 +481,24 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     },
     h('span', { className: 'study-place-name' }, location.name),
     h('span', { className: 'study-place-count' }, menusLabel(count)),
-    h('span', { className: 'study-place-meta' }, place, place && openingOf(location, preferences.date, preferences.service) ? ' · ' : null, opening))
+    h('span', { className: 'study-place-meta' }, place, place && openingOf(location, preferences.date, preferences.service) ? ' · ' : null, opening)),
+    h(Star, { location, preferences }))
   }
 
-  function PlaceList({ places, campus, preferences, refresh }: { places: Places; campus: Campus; preferences: Preferences; refresh: () => void }): Node {
+  /** The note under a tag's list: still loading, nothing after the filters, or nothing that day. */
+  function listNote(places: Places, tag: Tag, listed: Location[], preferences: Preferences) {
+    if (places.pending[tag] && !listed.length) return t(tag === 'uzh' ? 'loading.uzh' : 'loading')
+    if (listed.length) return places.pending[tag] ? t('loading.uzh') : ''
+    if (places.byTag[tag].length) return t('empty.filtered')
+    return t(tag === 'favorites' ? 'empty.favorites' : `empty.${preferences.service}`)
+  }
+
+  function PlaceList({ places, campus, preferences, refresh }: { places: Places; campus: Tag; preferences: Preferences; refresh: () => void }): Node {
     const open = useActiveInstance()
     if (places.error[campus]) return h('div', { className: 'study-note error', role: 'alert' }, places.error[campus])
-    const listed = places.byCampus[campus].filter(location => places.count(location) > 0)
-    const rows = listed.map(location => h(PlaceRow, { key: location.id, location, preferences, count: places.count(location), active: open === placeInstance(location.id), refresh }))
-    const note = places.pending[campus] ? t(campus === 'uzh' ? 'loading.uzh' : 'loading')
-      : listed.length ? '' : places.byCampus[campus].length ? t('empty.filtered') : t(`empty.${preferences.service}`)
+    const listed = places.byTag[campus].filter(location => places.count(location) > 0)
+    const rows = listed.map(location => h(PlaceRow, { key: location.id, location, preferences, count: places.count(location), active: open === placeInstance(location.id), tag: campus, refresh }))
+    const note = listNote(places, campus, listed, preferences)
     return h(React.Fragment, null, ...rows, note ? h('div', { className: 'study-note' }, note) : null)
   }
 
@@ -476,7 +522,7 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
       h('div', { className: 'study-bar' }, h(DayNav, { preferences }), h(PriceButton, { preferences }), h(FilterButton, { preferences })),
       h('div', { className: 'study-list' },
         h(PlaceList, { places, campus: active, preferences, refresh }),
-        h('div', { className: 'study-credit' }, t(active === 'uzh' ? 'credit.uzh' : 'credit.eth'))))
+        h('div', { className: 'study-credit' }, t(active === 'uzh' ? 'credit.uzh' : active === 'favorites' ? 'credit.both' : 'credit.eth'))))
   }
 
   function Cards({ location, preferences, revision }: { location: Location; preferences: Preferences; revision: number }): Node {
@@ -499,14 +545,14 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
   const scroll = (...children: (Node | null)[]): Node => h('div', { className: 'study-list' }, h('div', { className: 'study-page-inner' }, ...children))
 
   /** One place's page: a fixed bar with its location and hours, then its menus as cards; its name stands in the page's first bar. */
-  function PlaceBody({ place, preferences, revision, onTitle }: { place: NonNullable<ReturnType<typeof placeOf>>; preferences: Preferences; revision: number; onTitle: (title: string) => void }): Node {
+  function PlaceBody({ place, preferences, revision, onTitle, onLocation }: { place: NonNullable<ReturnType<typeof placeOf>>; preferences: Preferences; revision: number; onTitle: (title: string) => void; onLocation: (location: Location | null) => void }): Node {
     const monday = mondayOf(preferences.date)
     const eth = useEthWeek(preferences, revision, place.source === 'eth')
     const uzh = useAnswer<Location>(place.source === 'uzh' ? `${preferences.language}:${place.key}:${monday}` : null, revision,
       fresh => api.backend.call<Location>('uzh.week', { path: place.key, monday, language: preferences.language, fresh }))
     const state = place.source === 'eth' ? eth : uzh
     const location = place.source === 'eth' ? eth.data?.find(row => row.id === place.id) ?? null : uzh.data
-    React.useEffect(() => { if (location) onTitle(location.name) }, [location?.name])
+    React.useEffect(() => { if (location) onTitle(location.name); onLocation(location) }, [location])
     const facts = h('div', { className: 'study-bar study-facts' }, location ? h(PlaceFacts, { location, preferences }) : null)
     if (state.error) return h(React.Fragment, null, facts, scroll(h('div', { className: 'study-note error', role: 'alert' }, state.error)))
     if (!location) return h(React.Fragment, null, facts, scroll(h('div', { className: 'study-note' }, state.loading ? t('loading') : t('error.notFound'))))
@@ -522,7 +568,7 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     const heading = t(`campus.${active}.title`)
     React.useEffect(() => { onTitle(heading) }, [heading])
     if (places.error[active]) return scroll(h('div', { className: 'study-note error', role: 'alert' }, places.error[active]))
-    const listed = places.byCampus[active].filter(location => places.count(location) > 0)
+    const listed = places.byTag[active].filter(location => places.count(location) > 0)
     return scroll(
       ...listed.map(location => h('section', { key: location.id, className: 'study-section', 'data-place': location.id },
         h('button', {
@@ -532,9 +578,8 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
           onContextMenu: (event: MouseEvent) => void placeMenu(event, location, refresh)
         }, h('span', { className: 'study-place-link-name' }, location.name), h('span', { className: 'study-place-link-meta' }, where(location))),
         h(Cards, { location, preferences, revision }))),
-      places.pending[active] ? h('div', { className: 'study-note' }, t(active === 'uzh' ? 'loading.uzh' : 'loading'))
-        : listed.length ? null : h('div', { className: 'study-note' }, places.byCampus[active].length ? t('empty.filtered') : t(`empty.${preferences.service}`)),
-      h('div', { className: 'study-credit' }, t(active === 'uzh' ? 'credit.uzh' : 'credit.eth')))
+      listNote(places, active, listed, preferences) ? h('div', { className: 'study-note' }, listNote(places, active, listed, preferences)) : null,
+      h('div', { className: 'study-credit' }, t(active === 'uzh' ? 'credit.uzh' : active === 'favorites' ? 'credit.both' : 'credit.eth')))
   }
 
   function Page({ instanceId }: { instanceId?: string }): Node {
@@ -542,13 +587,15 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     const { revision, refreshing, refresh } = useRefresh()
     const place = placeOf(instanceId)
     const [title, setTitle] = React.useState('')
+    const [location, setLocation] = React.useState<Location | null>(null)
     React.useEffect(() => { api.workspace.setMainTabTitle(place ? title || t('menu.title') : t('menu.title'), instanceId) }, [instanceId, title, api.ui.language()])
     return h('div', { className: 'study-page' },
       h('div', { className: 'study-bar study-page-head' },
-        h('span', { className: 'study-bar-balance', 'aria-hidden': true }),
+        h('span', { className: `study-bar-balance${place ? ' double' : ''}`, 'aria-hidden': true }),
         h('h1', { className: 'study-page-title' }, title),
+        place && location ? h(Star, { location, preferences }) : place ? h('span', { className: 'study-bar-balance', 'aria-hidden': true }) : null,
         h('button', { type: 'button', className: `study-icon-btn${refreshing ? ' spinning' : ''}`, title: t('refresh'), 'aria-label': t('refresh'), onClick: refresh }, h(Icon, { shapes: REFRESH }))),
-      place ? h(PlaceBody, { place, preferences, revision, onTitle: setTitle }) : h(OverviewBody, { preferences, revision, refresh, onTitle: setTitle }))
+      place ? h(PlaceBody, { place, preferences, revision, onTitle: setTitle, onLocation: setLocation }) : h(OverviewBody, { preferences, revision, refresh, onTitle: setTitle }))
   }
 
   api.registerView('study.panel', Panel)

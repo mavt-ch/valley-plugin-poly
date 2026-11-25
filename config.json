@@ -91,11 +91,12 @@
         "type": "custom",
         "settingsVisible": false,
         "default": "hoengg",
-        "description": "The campus tag chosen in the menu plan.",
+        "description": "The tag chosen in the menu plan: Favorites or a campus.",
         "descriptionKey": "settings.campus.description",
         "schema": {
           "type": "string",
           "enum": [
+            "favorites",
             "eth",
             "hoengg",
             "uzh"
@@ -125,6 +126,24 @@
                 "dinner"
               ]
             }
+          }
+        }
+      },
+      {
+        "key": "favorites",
+        "label": "Favorite places",
+        "labelKey": "settings.favorites.title",
+        "type": "custom",
+        "settingsVisible": false,
+        "default": [],
+        "description": "The places starred in the menu plan.",
+        "descriptionKey": "settings.favorites.description",
+        "schema": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "type": "string",
+            "maxLength": 200
           }
         }
       }

@@ -63,7 +63,7 @@
   "settings.onlyGlutenFree.title": "Only gluten-free",
   "settings.onlyGlutenFree.description": "Show only menus whose declared allergens contain no gluten cereal. A menu without declared allergens is not shown.",
   "settings.campus.title": "Campus",
-  "settings.campus.description": "The campus tag chosen in the menu plan.",
+  "settings.campus.description": "The tag chosen in the menu plan: Favorites or a campus.",
   "settings.day.title": "Day",
   "settings.day.description": "The day and meal the menu plan shows; a past day falls back to today.",
   "price.internalStudents": "Staff & students",
@@ -74,5 +74,13 @@
   "prices": "Prices",
   "prices.all": "All prices",
   "settings.prices.title": "Prices shown",
-  "settings.prices.description": "Which prices the menu cards show: all of them from students to guests, or one group's."
+  "settings.prices.description": "Which prices the menu cards show: all of them from students to guests, or one group's.",
+  "campus.favorites": "Favorites",
+  "campus.favorites.title": "Favorite places",
+  "favorite.add": "Add {name} to favorites",
+  "favorite.remove": "Remove {name} from favorites",
+  "empty.favorites": "None of your favorite places has a menu for this meal on this day.",
+  "credit.both": "Menus from ETH Zurich Gastronomy and from the ZFV on food2050.",
+  "settings.favorites.title": "Favorite places",
+  "settings.favorites.description": "The places starred in the menu plan."
 }
