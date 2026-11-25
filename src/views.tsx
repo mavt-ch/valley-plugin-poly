@@ -30,9 +30,7 @@ export const VIEWS_CSS = `
 .study-seg button.active { background: var(--background-color, var(--container-color)); color: var(--title-color); box-shadow: 0 0 0 1px var(--border-light); }
 .study-seg button:focus-visible, .study-icon-btn:focus-visible, .study-day-label:focus-visible, .study-place:focus-visible, .study-card:focus-visible, .study-tile:focus-visible, .study-place-link:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -2px; }
 .study-day { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; }
-.study-page .study-day { justify-content: center; }
 .study-day-label { flex: 1; min-width: 0; height: var(--search-field-height, 26px); padding: 0 2px; border: 0; border-radius: var(--radius-sm, 4px); background: transparent; color: var(--title-color); font: inherit; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
-.study-page .study-day-label { flex: 0 1 auto; padding: 0 10px; }
 .study-day-label:hover { background: var(--hover-bg); }
 .study-day-label.today { color: var(--accent-color); }
 .study-icon-btn { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: var(--shell-control-toolbar, 24px); height: var(--shell-control-toolbar, 24px); padding: 0; border: 0; border-radius: var(--shell-control-radius, 4px); background: transparent; color: var(--text-secondary); cursor: pointer; }
@@ -69,7 +67,9 @@ export const VIEWS_CSS = `
 .study-open { color: var(--tint-green-text, var(--text-secondary)); }
 .study-closed { color: var(--text-secondary); }
 .study-place-head { display: grid; gap: 4px; padding: 0 2px 14px; }
-.study-place-title { margin: 0; color: var(--title-color); font-size: 1.4rem; font-weight: 650; }
+/* The page's first bar names the place (or the campus) only; day, meal and filters live in the sidebar. */
+.study-page-title { flex: 1; min-width: 0; margin: 0; color: var(--title-color); font-size: var(--normal-font-size, 1rem); font-weight: 600; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.study-page-head .study-bar-balance { width: var(--shell-control-toolbar, 24px); flex-shrink: 0; }
 .study-place-facts { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--text-secondary); font-size: var(--small-font-size); }
 .study-section + .study-section { margin-top: 22px; }
 .study-place-link { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 4px 2px 8px; border: 0; border-radius: var(--radius-sm, 4px); background: transparent; color: var(--title-color); font: inherit; text-align: left; cursor: pointer; }
@@ -332,10 +332,10 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
   const Services = ({ preferences }: { preferences: Preferences }): Node => h('div', { className: 'study-seg', role: 'group', 'aria-label': t('service.label') },
     seg<Service>('lunch', preferences.service, t('service.lunch'), service => setDay({ date: preferences.date, service })),
     seg<Service>('dinner', preferences.service, t('service.dinner'), service => setDay({ date: preferences.date, service })))
-  function DayNav({ preferences, long }: { preferences: Preferences; long: boolean }): Node {
+  function DayNav({ preferences }: { preferences: Preferences }): Node {
     const { date, service, locale } = preferences
     const isToday = date === today()
-    const label = long ? formatDay(date, locale, { weekday: 'long', day: 'numeric', month: 'long' }) : `${formatDay(date, locale, { weekday: 'short' })} ${formatDay(date, locale, { day: 'numeric', month: 'short' })}`
+    const label = `${formatDay(date, locale, { weekday: 'short' })} ${formatDay(date, locale, { day: 'numeric', month: 'short' })}`
     return h('div', { className: 'study-day' },
       h('button', { type: 'button', className: 'study-icon-btn', title: t('day.previous'), 'aria-label': t('day.previous'), onClick: () => setDay({ date: addDays(date, -1), service }) }, h(Icon, { shapes: LEFT })),
       h('button', { type: 'button', className: `study-day-label${isToday ? ' today' : ''}`, title: `${dayTitle(date, locale)} · ${isToday ? t('day.today') : t('day.backToToday')}`, 'aria-current': isToday ? 'date' : undefined, onClick: () => setDay({ date: today(), service }) }, label),
@@ -428,7 +428,7 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
             onAuxClick: (event: MouseEvent) => { if (event.button === 1) { event.preventDefault(); openOverview(true) } }
           }))),
       h(Tiles, { places, visible, active }),
-      h('div', { className: 'study-bar' }, h(DayNav, { preferences, long: false }), h(FilterButton, { preferences })),
+      h('div', { className: 'study-bar' }, h(DayNav, { preferences }), h(FilterButton, { preferences })),
       h('div', { className: 'study-list' },
         h(PlaceList, { places, campus: active, preferences, refresh }),
         h('div', { className: 'study-credit' }, t(active === 'uzh' ? 'credit.uzh' : 'credit.eth'))))
@@ -450,7 +450,7 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
       menu ? h('span', null, menusLabel(count)) : null)
   }
 
-  /** One place's page: its name, location, hours and its menus as cards. */
+  /** One place's page: its location, hours and its menus as cards; its name stands in the page's first bar. */
   function PlaceBody({ place, preferences, revision, onTitle }: { place: NonNullable<ReturnType<typeof placeOf>>; preferences: Preferences; revision: number; onTitle: (title: string) => void }): Node {
     const monday = mondayOf(preferences.date)
     const eth = useEthWeek(preferences, revision, place.source === 'eth')
@@ -462,21 +462,20 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     if (state.error) return h('div', { className: 'study-note error', role: 'alert' }, state.error)
     if (!location) return h('div', { className: 'study-note' }, state.loading ? t('loading') : t('error.notFound'))
     return h(React.Fragment, null,
-      h('div', { className: 'study-place-head' },
-        h('h1', { className: 'study-place-title' }, location.name),
-        h(PlaceFacts, { location, preferences })),
+      h('div', { className: 'study-place-head' }, h(PlaceFacts, { location, preferences })),
       h(Cards, { location, preferences, revision }),
       h('div', { className: 'study-credit' }, t(location.source === 'uzh' ? 'credit.uzh' : 'credit.eth')))
   }
 
   /** Without a place: every place of the chosen campus, each heading opening its own page. */
-  function OverviewBody({ preferences, revision, refresh }: { preferences: Preferences; revision: number; refresh: () => void }): Node {
+  function OverviewBody({ preferences, revision, refresh, onTitle }: { preferences: Preferences; revision: number; refresh: () => void; onTitle: (title: string) => void }): Node {
     const places = usePlaces(preferences, revision)
     const { active } = campusTags(places, preferences.campus)
+    const heading = t(`campus.${active}.title`)
+    React.useEffect(() => { onTitle(heading) }, [heading])
     if (places.error[active]) return h('div', { className: 'study-note error', role: 'alert' }, places.error[active])
     const listed = places.byCampus[active].filter(location => places.count(location) > 0)
     return h(React.Fragment, null,
-      h('div', { className: 'study-place-head' }, h('h1', { className: 'study-place-title' }, t(`campus.${active}.title`))),
       listed.map(location => h('section', { key: location.id, className: 'study-section', 'data-place': location.id },
         h('button', {
           type: 'button', className: 'study-place-link',
@@ -498,12 +497,11 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     React.useEffect(() => { api.workspace.setMainTabTitle(place ? title || t('menu.title') : t('menu.title'), instanceId) }, [instanceId, title, api.ui.language()])
     return h('div', { className: 'study-page' },
       h('div', { className: 'study-bar study-page-head' },
-        h(DayNav, { preferences, long: true }),
-        h(Services, { preferences }),
-        h(FilterButton, { preferences }),
+        h('span', { className: 'study-bar-balance', 'aria-hidden': true }),
+        h('h1', { className: 'study-page-title' }, title),
         h('button', { type: 'button', className: `study-icon-btn${refreshing ? ' spinning' : ''}`, title: t('refresh'), 'aria-label': t('refresh'), onClick: refresh }, h(Icon, { shapes: REFRESH }))),
       h('div', { className: 'study-list' }, h('div', { className: 'study-page-inner' },
-        place ? h(PlaceBody, { place, preferences, revision, onTitle: setTitle }) : h(OverviewBody, { preferences, revision, refresh }))))
+        place ? h(PlaceBody, { place, preferences, revision, onTitle: setTitle }) : h(OverviewBody, { preferences, revision, refresh, onTitle: setTitle }))))
   }
 
   api.registerView('study.panel', Panel)
