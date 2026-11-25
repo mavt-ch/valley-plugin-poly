@@ -1,0 +1,17 @@
+{
+  "apiVersion": 5,
+  "id": "study",
+  "name": "Study",
+  "version": "1.0.0",
+  "description": "Study tools for ETH and UZH students, starting with today's menu plan of ETH Hönggerberg and the UZH mensas.",
+  "author": [
+    "mavt"
+  ],
+  "authorUrl": [
+    "https://github.com/mavt-ch"
+  ],
+  "license": "MIT",
+  "minAppVersion": "1.0.0",
+  "isDesktopOnly": true,
+  "enabled": true
+}

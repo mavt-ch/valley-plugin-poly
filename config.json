@@ -1,0 +1,117 @@
+{
+  "icon": "icon.svg",
+  "main": "runtime/index.js",
+  "runtime": {
+    "ui": "runtime/index.js",
+    "backend": "runtime/backend.js"
+  },
+  "uiSlots": {
+    "left_sidebar": "study.panel",
+    "main_workspace": "study.page"
+  },
+  "slotDefaults": {
+    "left_sidebar": {
+      "order": 220
+    }
+  },
+  "keepTabIcon": true,
+  "settingsSchema": {
+    "fields": [
+      {
+        "key": "priceGroup",
+        "label": "Prices for",
+        "labelKey": "settings.priceGroup.title",
+        "type": "select",
+        "default": "students",
+        "description": "Which price the menu plan shows beside each dish.",
+        "descriptionKey": "settings.priceGroup.description",
+        "options": [
+          {
+            "value": "students",
+            "label": "Students",
+            "labelKey": "price.students"
+          },
+          {
+            "value": "internal",
+            "label": "Staff",
+            "labelKey": "price.internal"
+          },
+          {
+            "value": "external",
+            "label": "Guests",
+            "labelKey": "price.external"
+          }
+        ]
+      },
+      {
+        "key": "source",
+        "label": "University",
+        "labelKey": "settings.source.title",
+        "type": "custom",
+        "settingsVisible": false,
+        "default": "eth",
+        "description": "The university the menu plan shows.",
+        "descriptionKey": "settings.source.description",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "eth",
+            "uzh"
+          ]
+        }
+      },
+      {
+        "key": "opened",
+        "label": "Opened outlets",
+        "labelKey": "settings.opened.title",
+        "type": "custom",
+        "settingsVisible": false,
+        "default": [],
+        "description": "Outlets of the menu plan opened by hand.",
+        "descriptionKey": "settings.opened.description",
+        "schema": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      },
+      {
+        "key": "folded",
+        "label": "Folded outlets",
+        "labelKey": "settings.folded.title",
+        "type": "custom",
+        "settingsVisible": false,
+        "default": [],
+        "description": "Outlets of the menu plan folded by hand.",
+        "descriptionKey": "settings.folded.description",
+        "schema": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
+        }
+      }
+    ]
+  },
+  "permissions": {
+    "network": {
+      "hosts": [
+        "idapps.ethz.ch",
+        "app.food2050.ch",
+        "storage.googleapis.com"
+      ]
+    }
+  },
+  "locales": {
+    "en": "runtime/locales/en.json",
+    "de": "runtime/locales/de.json",
+    "es": "runtime/locales/es.json",
+    "fr": "runtime/locales/fr.json",
+    "zh-CN": "runtime/locales/zh-CN.json"
+  }
+}
