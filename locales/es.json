@@ -52,13 +52,10 @@
   "filter.vegetarian": "Vegetariano",
   "filter.vegan": "Vegano",
   "filter.glutenFree": "Sin gluten",
-  "filter.price": "Precio",
   "filter.clear": "Quitar filtros",
   "empty.filtered": "Ningún menú coincide con los filtros.",
   "loading.uzh": "Leyendo los locales de la UZH…",
   "openInNewTab": "Abrir en una pestaña nueva",
-  "settings.price.title": "Precio mostrado",
-  "settings.price.description": "Qué precio muestra el menú en cada plato: estudiantes, personal o invitados.",
   "settings.onlyVegetarian.title": "Solo vegetariano",
   "settings.onlyVegetarian.description": "Mostrar solo menús vegetarianos y veganos, en los recuentos de la lista de lugares y en la página.",
   "settings.onlyVegan.title": "Solo vegano",
@@ -70,5 +67,8 @@
   "settings.day.title": "Día",
   "settings.day.description": "El día y la comida que muestra el menú; un día pasado vuelve a hoy.",
   "price.internalStudents": "Personal y estudiantes",
-  "price.all": "Todos los visitantes"
+  "price.all": "Todos los visitantes",
+  "filter.lactoseFree": "Sin lactosa",
+  "settings.onlyLactoseFree.title": "Solo sin lactosa",
+  "settings.onlyLactoseFree.description": "Mostrar solo menús cuyos alérgenos declarados no incluyen leche. Un menú sin alérgenos declarados no se muestra."
 }

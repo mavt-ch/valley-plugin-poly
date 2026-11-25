@@ -15,12 +15,9 @@ export type Climate = 'LOW' | 'MEDIUM' | 'HIGH'
 /** Who a price is for: one of the three groups, staff and students together, or every visitor. */
 export type PriceKind = PriceGroup | 'internalStudents' | 'all'
 export type Price = { group: PriceKind; price: number }
-const COVERS: Record<PriceKind, PriceGroup[]> = { students: ['students'], internal: ['internal'], external: ['external'], internalStudents: ['internal', 'students'], all: ['students', 'internal', 'external'] }
-/** The price the chosen group pays: its own price, else a shared price that covers it ("All visitors"). */
-export const priceFor = (prices: Price[], group: PriceGroup): Price | undefined =>
-  prices.find(row => row.group === group) ?? prices.find(row => COVERS[row.group].includes(group))
-/** Whether the price list needs its detail line: more than one price, or one shared price. */
-export const pricesWorthListing = (prices: Price[]) => prices.length > 1 || prices.some(row => COVERS[row.group].length > 1)
+const PRICE_ORDER: PriceKind[] = ['students', 'internalStudents', 'internal', 'external', 'all']
+/** A dish's prices from students to guests, the order the card shows them in ("CHF 7.90 / 10.90 / 13.90"). */
+export const pricesInOrder = (prices: Price[]) => [...prices].sort((a, b) => PRICE_ORDER.indexOf(a.group) - PRICE_ORDER.indexOf(b.group))
 export type Dish = {
   id: string
   line: string
@@ -33,6 +30,8 @@ export type Dish = {
   climate: Climate | null
   /** True when a declared allergen is a gluten cereal, false when allergens are declared without one, null when none are declared. */
   gluten: boolean | null
+  /** The same for milk and lactose. */
+  lactose: boolean | null
   /** The dish picture's address at its source ('' when it has none). */
   image: string
   /** food2050's page of this dish, which holds its picture and prices ('' for ETH). */
@@ -97,6 +96,9 @@ const GROUPS: Record<number, PriceKind> = { 10: 'students', 11: 'internal', 12: 
 const ETH_GLUTEN_CODE = 10
 /** food2050's allergen ids of the gluten cereals. */
 export const UZH_GLUTEN_IDS = ['cerealsContainingGluten', 'wheat', 'barley', 'rye', 'spelt', 'oat', 'oats', 'kamut']
+/** Cookpit's allergen code for milk ("milk, lactose") and food2050's milk ids. */
+const ETH_MILK_CODE = 16
+export const UZH_MILK_IDS = ['milk', 'lactose']
 
 // ── ETH (Cookpit) ────────────────────────────────────────────────────────────
 
@@ -168,6 +170,7 @@ function ethDish(line: Record<string, unknown>, fallback: Map<number, Record<str
     allergens: allergens.map(row => text(row.desc)).filter(Boolean),
     climate: null,
     gluten: allergens.length ? allergens.some(row => row.code === ETH_GLUTEN_CODE || /gluten/i.test(text(row.desc))) : null,
+    lactose: allergens.length ? allergens.some(row => row.code === ETH_MILK_CODE || /milk|lactose|milch|laktose/i.test(text(row.desc))) : null,
     image: ethImage(meal['image-url']),
     detail: ''
   }
@@ -352,6 +355,7 @@ export function parseUzhWeek(html: string): Map<string, Dish[]> {
         allergens,
         climate,
         gluten: allergens.length ? allergens.some(id => UZH_GLUTEN_IDS.includes(id)) : null,
+        lactose: allergens.length ? allergens.some(id => UZH_MILK_IDS.includes(id)) : null,
         image: '',
         detail: isDishUrl(text(item.detailUrl)) ? text(item.detailUrl) : ''
       }]
@@ -415,19 +419,20 @@ export function uzhLocation(outlet: Outlet, page: UzhOutletPage, weeks: { servic
 
 // ── Filters and the place list ───────────────────────────────────────────────
 
-export type Filters = { vegetarian: boolean; vegan: boolean; glutenFree: boolean }
-export const NO_FILTERS: Filters = { vegetarian: false, vegan: false, glutenFree: false }
-export const hasFilters = (filters: Filters) => filters.vegetarian || filters.vegan || filters.glutenFree
+export type Filters = { vegetarian: boolean; vegan: boolean; glutenFree: boolean; lactoseFree: boolean }
+export const NO_FILTERS: Filters = { vegetarian: false, vegan: false, glutenFree: false, lactoseFree: false }
+export const hasFilters = (filters: Filters) => filters.vegetarian || filters.vegan || filters.glutenFree || filters.lactoseFree
 
 /**
  * Whether a dish passes the diet filters. Vegetarian includes vegan dishes. Gluten-free needs the
- * source to declare the dish's allergens without a gluten cereal: a dish without any declared
- * allergens is never called gluten-free.
+ * source to declare the dish's allergens without a gluten cereal, lactose-free without milk: a
+ * dish without any declared allergens is never called gluten- or lactose-free.
  */
 export function matchesFilters(dish: Dish, filters: Filters): boolean {
   if (filters.vegan && dish.diet !== 'vegan') return false
   if (filters.vegetarian && !dish.diet) return false
   if (filters.glutenFree && dish.gluten !== false) return false
+  if (filters.lactoseFree && dish.lactose !== false) return false
   return true
 }
 

@@ -52,13 +52,10 @@
   "filter.vegetarian": "素食",
   "filter.vegan": "纯素",
   "filter.glutenFree": "无麸质",
-  "filter.price": "价格",
   "filter.clear": "清除筛选",
   "empty.filtered": "没有符合筛选条件的菜单。",
   "loading.uzh": "正在读取 UZH 餐厅…",
   "openInNewTab": "在新标签页中打开",
-  "settings.price.title": "显示的价格",
-  "settings.price.description": "菜单为每道菜显示的价格：学生、员工或访客。",
   "settings.onlyVegetarian.title": "仅素食",
   "settings.onlyVegetarian.description": "仅显示素食和纯素菜单，包括地点列表的计数和页面。",
   "settings.onlyVegan.title": "仅纯素",
@@ -70,5 +67,8 @@
   "settings.day.title": "日期",
   "settings.day.description": "菜单显示的日期和餐次；过去的日期会回到今天。",
   "price.internalStudents": "员工和学生",
-  "price.all": "所有访客"
+  "price.all": "所有访客",
+  "filter.lactoseFree": "无乳糖",
+  "settings.onlyLactoseFree.title": "仅无乳糖",
+  "settings.onlyLactoseFree.description": "仅显示已声明过敏原中不含牛奶的菜单。未声明过敏原的菜单不显示。"
 }

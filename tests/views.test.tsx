@@ -128,14 +128,14 @@ describe('menu plan panel', () => {
     expect(openMainTab).toHaveBeenLastCalledWith({ newTab: false })
   })
 
-  it('filters the menu counts by diet and saves the filters and the price', async () => {
+  it('filters the menu counts by diet and saves the filters', async () => {
     const { container, menu, settings } = harness()
     await settle()
     menu.mockResolvedValueOnce('glutenFree')
     fireEvent.click(screen.getByRole('button', { name: 'Filter' }))
     await settle()
     const items = (menu.mock.calls[0] as unknown as [{ id?: string; checked?: boolean; type?: string }[]])[0]
-    expect(items.map(item => item.id ?? '—')).toEqual(['vegetarian', 'vegan', 'glutenFree', '—', 'price:students', 'price:internal', 'price:external'])
+    expect(items.map(item => item.id ?? '—')).toEqual(['vegetarian', 'vegan', '—', 'glutenFree', 'lactoseFree'])
     expect(settings.onlyGlutenFree).toBe(true)
     expect(place(container, 'eth:1')!.textContent).toContain('1 menu')
     expect(screen.getByRole('button', { name: 'Filter · Gluten-free' }).className).toContain('active')
@@ -143,10 +143,10 @@ describe('menu plan panel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Filter · Gluten-free' }))
     await settle()
     expect(settings.onlyVegetarian).toBe(true)
-    menu.mockResolvedValueOnce('price:external')
+    menu.mockResolvedValueOnce('lactoseFree')
     fireEvent.click(screen.getByRole('button', { name: /^Filter/ }))
     await settle()
-    expect(settings.price).toBe('external')
+    expect(settings.onlyLactoseFree).toBe(true)
     menu.mockResolvedValueOnce('vegan')
     fireEvent.click(screen.getByRole('button', { name: /^Filter/ }))
     await settle()
@@ -159,7 +159,7 @@ describe('menu plan panel', () => {
     menu.mockResolvedValueOnce('clear')
     fireEvent.click(screen.getByRole('button', { name: /^Filter/ }))
     await settle()
-    expect([settings.onlyVegetarian, settings.onlyVegan, settings.onlyGlutenFree]).toEqual([false, false, false])
+    expect([settings.onlyVegetarian, settings.onlyVegan, settings.onlyGlutenFree, settings.onlyLactoseFree]).toEqual([false, false, false, false])
     expect(place(container, 'eth:1')!.textContent).toContain('2 menus')
   })
 
@@ -233,36 +233,35 @@ describe('menu plan page', () => {
     expect(screen.queryByAltText('Bratwurst')).toBeNull()
     expect(calls.filter(([name]) => name === 'image')).toHaveLength(1)
     expect(calls.some(([name]) => name === 'uzh.week')).toBe(false)
-    expect(screen.getAllByText('CHF 7.50')).toHaveLength(2)
-    fireEvent.click(screen.getByText('Bratwurst'))
-    expect(screen.getByText('Allergens: gluten wheat, celery')).toBeTruthy()
-    expect(screen.getByText('Students CHF 7.50 · Staff CHF 10.50 · Guests CHF 13.50')).toBeTruthy()
+    const bratwurst = container.querySelector('[data-dish="eth:102"]')!
+    expect(bratwurst.tagName).toBe('DIV')
+    expect([...bratwurst.querySelectorAll('.study-card-body > *')].map(node => node.className)).toEqual(['study-dish-top', 'study-dish-name', 'study-dish-description', 'study-dish-allergens', 'study-tags'])
+    const price = bratwurst.querySelector('.study-dish-price')!
+    expect(price.textContent).toBe('CHF 7.50 / 10.50 / 13.50')
+    expect(price.getAttribute('title')).toBe('Students CHF 7.50 · Staff CHF 10.50 · Guests CHF 13.50')
+    expect(bratwurst.querySelector('.study-dish-allergens')!.textContent).toBe('Allergens: gluten wheat, celery')
+    expect(screen.getAllByText('Lactose-free')).toHaveLength(2)
   })
 
-  it('follows the filters and the chosen price', async () => {
-    harness({ onlyVegan: true, price: 'internal' }, 'study.page', { instanceId: 'place:eth:1' })
+  it('follows the filters', async () => {
+    harness({ onlyVegan: true }, 'study.page', { instanceId: 'place:eth:1' })
     await settle()
     expect(screen.getByText('Lentil curry')).toBeTruthy()
     expect(screen.queryByText('Bratwurst')).toBeNull()
-    expect(screen.getByText('CHF 10.50')).toBeTruthy()
     cleanup()
     harness({ onlyVegan: true, day: { date: '2026-11-25', service: 'dinner' } }, 'study.page', { instanceId: 'place:eth:1' })
     await settle()
     expect(screen.getByText('No menu matches the filters.')).toBeTruthy()
   })
 
-  it('shows a price for all visitors whatever group is chosen, listed once in the details', async () => {
-    harness({ price: 'external' }, 'study.page', { instanceId: 'place:eth:6' })
+  it('shows a shared price once, named in its tooltip', async () => {
+    harness({}, 'study.page', { instanceId: 'place:eth:6' })
     await settle()
-    expect(screen.getByText('CHF 22.00')).toBeTruthy()
-    fireEvent.click(screen.getByText('Braised beef'))
-    expect(screen.getByText('All visitors CHF 22.00')).toBeTruthy()
+    expect(screen.getByText('CHF 22.00').getAttribute('title')).toBe('All visitors CHF 22.00')
     cleanup()
-    harness({ price: 'internal' }, 'study.page', { instanceId: 'place:eth:2' })
+    harness({}, 'study.page', { instanceId: 'place:eth:2' })
     await settle()
-    expect(screen.getByText('CHF 9.50')).toBeTruthy()
-    fireEvent.click(screen.getByText('Tofu bowl'))
-    expect(screen.getByText('Staff & students CHF 9.50 · Guests CHF 12.00')).toBeTruthy()
+    expect(screen.getByText('CHF 9.50 / 12.00').getAttribute('title')).toBe('Staff & students CHF 9.50 · Guests CHF 12.00')
   })
 
   it('reads one UZH outlet and its dish pages for picture and price', async () => {
@@ -272,7 +271,7 @@ describe('menu plan page', () => {
     expect(screen.getByRole('heading', { name: 'Obere Mensa' })).toBeTruthy()
     expect(calls.some(([name, input]) => name === 'uzh.dish' && String(input.url).endsWith('/lunch,menu-1/2026-11-25'))).toBe(true)
     expect((screen.getByAltText('COUSCOUS BOWL') as HTMLImageElement).src).toBe(`data:image/jpeg;base64,${btoa(DISH_IMAGE)}`)
-    expect(screen.getByText('CHF 6.10')).toBeTruthy()
+    expect(screen.getByText('CHF 6.10 / 9.00')).toBeTruthy()
   })
 
   it('without a place shows the chosen campus with links to each place’s page', async () => {

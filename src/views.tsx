@@ -10,8 +10,8 @@
 import type { ValleyPluginApi } from '@valley/plugin-sdk'
 import { paletteCssContrast, paletteCssValue } from '@valley/plugin-sdk/palette'
 import {
-  CAMPUSES, addDays, defaultService, dishesOf, formatPrice, hasFilters, priceFor, pricesWorthListing, isDate, menuOf, mondayOf, openState, openingOf, placeInstance, placeOf, sourceLanguage, today,
-  type Campus, type Dish, type DishDetail, type Filters, type Location, type Outlet, type PriceGroup, type Service
+  CAMPUSES, addDays, defaultService, dishesOf, formatPrice, hasFilters, pricesInOrder, isDate, menuOf, mondayOf, openState, openingOf, placeInstance, placeOf, sourceLanguage, today,
+  type Campus, type Dish, type DishDetail, type Filters, type Location, type Outlet, type Price, type Service
 } from './model'
 
 export const VIEWS_CSS = `
@@ -79,26 +79,26 @@ export const VIEWS_CSS = `
 .study-place-link:hover .study-place-link-name { text-decoration: underline; }
 .study-place-link-name { font-size: 1.15rem; font-weight: 600; }
 .study-place-link-meta { min-width: 0; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--small-font-size); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.study-dish-top { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
-.study-dish-line { flex: 1; min-width: 0; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); text-transform: uppercase; letter-spacing: 0.04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Line and prices share a row; when the line's name does not fit beside the prices, the prices drop to their own row (right-aligned) instead of cutting the name. */
+.study-dish-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; min-width: 0; }
+.study-dish-top .study-dish-price { margin-left: auto; }
+.study-dish-line { flex: 1 1 auto; min-width: 0; max-width: 100%; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); text-transform: uppercase; letter-spacing: 0.04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .study-dish-price { flex-shrink: 0; color: var(--text-secondary); font-size: var(--small-font-size); font-variant-numeric: tabular-nums; }
 .study-dish-name { color: var(--title-color); font-weight: 600; overflow-wrap: anywhere; }
 .study-dish-description { color: var(--text-secondary); font-size: var(--small-font-size); overflow-wrap: anywhere; }
 .study-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
 .study-tag { padding: 0 6px; border-radius: 999px; background: var(--hover-bg); color: var(--text-secondary); font-size: var(--smaller-font-size); line-height: 1.6; }
-.study-tag.vegan, .study-tag.vegetarian, .study-tag.glutenFree, .study-tag.LOW { background: var(--tint-green-bg, var(--hover-bg)); color: var(--tint-green-text, var(--text-secondary)); }
+.study-tag.vegan, .study-tag.vegetarian, .study-tag.glutenFree, .study-tag.lactoseFree, .study-tag.LOW { background: var(--tint-green-bg, var(--hover-bg)); color: var(--tint-green-text, var(--text-secondary)); }
 .study-tag.HIGH { background: var(--tint-orange-bg, var(--hover-bg)); color: var(--tint-orange-text, var(--text-secondary)); }
-.study-dish-extra { margin-top: 3px; color: var(--text-secondary); font-size: var(--smaller-font-size); }
+.study-dish-allergens { margin-top: 2px; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); overflow-wrap: anywhere; }
 .study-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; padding: 2px 0 4px; }
-.study-card { display: flex; flex-direction: column; min-width: 0; padding: 0; overflow: hidden; border: 1px solid var(--border-light); border-radius: 8px; background: var(--container-color, transparent); color: var(--text-color); font: inherit; text-align: left; cursor: pointer; }
-.study-card:hover, .study-card.open { border-color: var(--border-color, var(--text-tertiary)); }
+.study-card { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid var(--border-light); border-radius: 8px; background: var(--container-color, transparent); color: var(--text-color); }
 .study-card-image { position: relative; aspect-ratio: 3 / 2; background: var(--hover-bg); display: grid; place-items: center; color: var(--text-tertiary, var(--text-secondary)); }
 .study-card-image svg { width: 30px; height: 30px; opacity: 0.6; }
 .study-card-image img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .study-card-body { display: grid; gap: 3px; padding: 10px 12px 12px; }
 .study-card .study-dish-name { font-size: 1rem; }
 .study-card .study-dish-description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
-.study-card.open .study-dish-description { display: block; }
 /* A narrow page lays each card out as a row: picture left, text right. */
 @container (max-width: 560px) {
   .study-page-inner { padding: 10px 12px 28px; }
@@ -127,8 +127,8 @@ const CAMPUS_ICONS: Record<Campus, Shapes> = {
   uzh: ['M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z', 'M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z']
 }
 const CAMPUS_COLORS: Record<Campus, string> = { eth: 'palette:primary-blue', hoengg: 'palette:green', uzh: 'palette:violet' }
-const PRICES: PriceGroup[] = ['students', 'internal', 'external']
-const FILTER_KEYS = [['vegetarian', 'onlyVegetarian'], ['vegan', 'onlyVegan'], ['glutenFree', 'onlyGlutenFree']] as const
+/** The diet filters in the menu's two groups: what the dish is, then what it leaves out. */
+const FILTER_KEYS = [['vegetarian', 'onlyVegetarian'], ['vegan', 'onlyVegan'], ['glutenFree', 'onlyGlutenFree'], ['lactoseFree', 'onlyLactoseFree']] as const
 
 type State<T> = { data: T | null; error: string; loading: boolean }
 type Day = { date: string; service: Service }
@@ -160,13 +160,11 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
       return () => { for (const off of offs) off() }
     }, [])
     const settings = api.settings.get()
-    const price = settings.price
     return {
       language: sourceLanguage(api.ui.language()),
       locale: api.ui.language() || 'en',
       campus: (CAMPUSES.includes(settings.campus as Campus) ? settings.campus : 'hoengg') as Campus,
-      price: (PRICES.includes(price as PriceGroup) ? price : 'students') as PriceGroup,
-      filters: { vegetarian: settings.onlyVegetarian === true, vegan: settings.onlyVegan === true, glutenFree: settings.onlyGlutenFree === true } as Filters,
+      filters: { vegetarian: settings.onlyVegetarian === true, vegan: settings.onlyVegan === true, glutenFree: settings.onlyGlutenFree === true, lactoseFree: settings.onlyLactoseFree === true } as Filters,
       ...dayOf(settings.day)
     }
   }
@@ -246,43 +244,49 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     return [
       ...(dish.diet ? [{ key: dish.diet, label: t(`diet.${dish.diet}`) }] : []),
       ...(dish.gluten === false ? [{ key: 'glutenFree', label: t('filter.glutenFree') }] : []),
+      ...(dish.lactose === false ? [{ key: 'lactoseFree', label: t('filter.lactoseFree') }] : []),
       ...dish.classes.map(label => ({ key: '', label })),
       ...(dish.climate ? [{ key: dish.climate, label: t(`climate.${dish.climate}`) }] : [])
     ]
   }
-  function detailsOf(dish: Dish, prices: DishDetail['prices']) {
-    return [
-      pricesWorthListing(prices) ? prices.map(row => `${t(`price.${row.group}`)} ${formatPrice(row.price)}`).join(' · ') : '',
-      dish.allergens.length ? `${t('allergens')}: ${dish.allergens.join(', ')}` : t('allergens.none')
-    ].filter(Boolean)
+  /** Every price on one line, students to guests ("CHF 7.90 / 10.90 / 13.90"); the tooltip names each group. */
+  function priceLine(prices: Price[]) {
+    const ordered = pricesInOrder(prices)
+    return {
+      short: ordered.length ? `CHF ${ordered.map(row => row.price.toFixed(2)).join(' / ')}` : '',
+      long: ordered.map(row => `${t(`price.${row.group}`)} ${formatPrice(row.price)}`).join(' · ')
+    }
   }
   const Tags = ({ dish }: { dish: Dish }): Node | null => {
     const tags = tagsOf(dish)
     return tags.length ? h('span', { className: 'study-tags' }, tags.map(tag => h('span', { key: `${tag.key}:${tag.label}`, className: `study-tag ${tag.key}` }, tag.label))) : null
   }
 
-  /** A dish card: the picture (read once the card is on screen), and for UZH its page's picture and prices. */
-  function DishCard({ dish, group, revision }: { dish: Dish; group: PriceGroup; revision: number }): Node {
-    const ref = React.useRef<HTMLButtonElement>(null)
-    const [open, setOpen] = React.useState(false)
+  /**
+   * A dish card, one compact form with everything on it: picture (read once the card is on screen),
+   * line and all prices, name, description, allergens, then the tags. For UZH the picture and prices
+   * come from the dish's own page.
+   */
+  function DishCard({ dish, revision }: { dish: Dish; revision: number }): Node {
+    const ref = React.useRef<HTMLDivElement>(null)
     const visible = useVisible(ref)
     const detail = useAnswer<DishDetail>(visible && dish.detail ? dish.detail : null, revision, fresh => api.backend.call<DishDetail>('uzh.dish', { url: dish.detail, fresh }))
     const source = dish.image || detail.data?.image || ''
     const picture = useAnswer<string>(visible && source ? source : null, 0, () => api.backend.call<string>('image', { url: source }))
     const prices = dish.prices.length ? dish.prices : detail.data?.prices ?? []
-    const price = priceFor(prices, group)
-    return h('button', { ref, type: 'button', className: `study-card${open ? ' open' : ''}`, 'aria-expanded': open, onClick: () => setOpen(!open) },
+    const price = priceLine(prices)
+    return h('div', { ref, className: 'study-card', 'data-dish': dish.id },
       h('span', { className: 'study-card-image' },
         h(Icon, { shapes: DISH }),
         picture.data ? h('img', { src: picture.data, alt: dish.name, draggable: false }) : null),
       h('span', { className: 'study-card-body' },
         h('span', { className: 'study-dish-top' },
           h('span', { className: 'study-dish-line' }, dish.line),
-          price ? h('span', { className: 'study-dish-price' }, formatPrice(price.price)) : null),
+          price.short ? h('span', { className: 'study-dish-price', title: price.long, 'aria-label': price.long }, price.short) : null),
         h('span', { className: 'study-dish-name' }, dish.name),
         dish.description ? h('span', { className: 'study-dish-description' }, dish.description) : null,
-        h(Tags, { dish }),
-        ...(open ? detailsOf(dish, prices).map(line => h('span', { key: line, className: 'study-dish-extra' }, line)) : [])))
+        h('span', { className: 'study-dish-allergens' }, dish.allergens.length ? `${t('allergens')}: ${dish.allergens.join(', ')}` : t('allergens.none')),
+        h(Tags, { dish })))
   }
 
   /** "Open now · 11:00–14:00" today, the hours alone on another day; null without published hours. */
@@ -311,19 +315,19 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     if (choice === 'refresh') refresh()
   }
 
-  /** The diet filters and the price shown, as a header filter menu. */
+  /** The diet filters, as a header filter menu. */
   function FilterButton({ preferences }: { preferences: Preferences }): Node {
     const active = hasFilters(preferences.filters)
     const pick = async (event: MouseEvent) => {
       const choice = await api.ui.openMenu([
-        ...FILTER_KEYS.map(([name]) => ({ id: name, type: 'checkbox' as const, label: t(`filter.${name}`), checked: preferences.filters[name] })),
-        { type: 'separator' },
-        ...PRICES.map(group => ({ id: `price:${group}`, type: 'radio' as const, label: `${t('filter.price')}: ${t(`price.${group}`)}`, checked: preferences.price === group })),
+        ...FILTER_KEYS.flatMap(([name], index) => [
+          ...(index === 2 ? [{ type: 'separator' as const }] : []),
+          { id: name, type: 'checkbox' as const, label: t(`filter.${name}`), checked: preferences.filters[name] }
+        ]),
         ...(active ? [{ type: 'separator' as const }, { id: 'clear', label: t('filter.clear') }] : [])
       ], { anchor: event.currentTarget as HTMLElement, align: 'end' })
       if (!choice) return
       if (choice === 'clear') { for (const [, key] of FILTER_KEYS) void api.settings.set(key, false); return }
-      if (choice.startsWith('price:')) { void api.settings.set('price', choice.slice(6)); return }
       const entry = FILTER_KEYS.find(([name]) => name === choice)
       if (entry) void api.settings.set(entry[1], !preferences.filters[entry[0]])
     }
@@ -441,7 +445,7 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
   function Cards({ location, preferences, revision }: { location: Location; preferences: Preferences; revision: number }): Node {
     const dishes = dishesOf(location, preferences.date, preferences.service, preferences.filters)
     if (!dishes.length) return h('div', { className: 'study-note' }, menuOf(location, preferences.date, preferences.service) ? t('empty.filtered') : t('empty.location'))
-    return h('div', { className: 'study-cards' }, dishes.map(dish => h(DishCard, { key: dish.id, dish, group: preferences.price, revision })))
+    return h('div', { className: 'study-cards' }, dishes.map(dish => h(DishCard, { key: dish.id, dish, revision })))
   }
 
   function PlaceFacts({ location, preferences }: { location: Location; preferences: Preferences }): Node {

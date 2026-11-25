@@ -18,32 +18,6 @@
   "settingsSchema": {
     "fields": [
       {
-        "key": "price",
-        "label": "Price shown",
-        "labelKey": "settings.price.title",
-        "type": "select",
-        "default": "students",
-        "description": "Which price the menu plan shows on each dish: students, staff or guests.",
-        "descriptionKey": "settings.price.description",
-        "options": [
-          {
-            "value": "students",
-            "label": "Students",
-            "labelKey": "price.students"
-          },
-          {
-            "value": "internal",
-            "label": "Staff",
-            "labelKey": "price.internal"
-          },
-          {
-            "value": "external",
-            "label": "Guests",
-            "labelKey": "price.external"
-          }
-        ]
-      },
-      {
         "key": "onlyVegetarian",
         "label": "Only vegetarian",
         "labelKey": "settings.onlyVegetarian.title",
@@ -69,6 +43,15 @@
         "default": false,
         "description": "Show only menus whose declared allergens contain no gluten cereal. A menu without declared allergens is not shown.",
         "descriptionKey": "settings.onlyGlutenFree.description"
+      },
+      {
+        "key": "onlyLactoseFree",
+        "label": "Only lactose-free",
+        "labelKey": "settings.onlyLactoseFree.title",
+        "type": "boolean",
+        "default": false,
+        "description": "Show only menus whose declared allergens contain no milk. A menu without declared allergens is not shown.",
+        "descriptionKey": "settings.onlyLactoseFree.description"
       },
       {
         "key": "campus",

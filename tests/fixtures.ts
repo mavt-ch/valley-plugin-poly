@@ -28,7 +28,7 @@ export const ETH_ROTAS = {
             line('Grill', 102, 'novalue', 'novalue', 11, { 'allergen-array': [{ code: 10, desc: 'gluten wheat' }, { code: 18, desc: 'celery' }] }),
             { name: 'Closed line' }
           ] },
-          { name: 'Abend', 'time-from': '17:30', 'time-to': '19:30', 'line-array': [line('Evening', 103, 'Pasta al forno', 'Tomato | Basil', 17)] }
+          { name: 'Abend', 'time-from': '17:30', 'time-to': '19:30', 'line-array': [line('Evening', 103, 'Pasta al forno', 'Tomato | Basil', 17, { 'allergen-array': [{ code: 16, desc: 'milk, lactose' }, { code: 18, desc: 'celery' }] })] }
         ] }] },
         { 'day-of-week-code': 6 }
       ]

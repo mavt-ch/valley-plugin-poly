@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addDays, defaultService, dishesOf, priceFor, pricesWorthListing, ethCampus, ethZone, matchesFilters, menuOf, openState, openingOf, placeInstance, placeOf, NO_FILTERS, ethHasGaps, ethMealsById, flightPayload, isHoenggerberg, isoWeek, mondayOf, outletPath, parseEthFacilities, parseEthWeek,
+  addDays, defaultService, dishesOf, pricesInOrder, ethCampus, ethZone, matchesFilters, menuOf, openState, openingOf, placeInstance, placeOf, NO_FILTERS, ethHasGaps, ethMealsById, flightPayload, isHoenggerberg, isoWeek, mondayOf, outletPath, parseEthFacilities, parseEthWeek,
   ethImage, isDishUrl, isImageUrl, parseUzhDish, priceGroupOf, parseUzhAllergenNames, parseUzhOutlet, parseUzhOutlets, parseUzhWeek, payloadProps, sourceLanguage, uzhLocation, weekday
 } from '../src/model'
 import { DISH_IMAGE, ETH_FACILITIES, ETH_ROTAS, ETH_ROTAS_DE, UZH_DINNER, UZH_DISH, UZH_LUNCH, UZH_ORG, UZH_OUTLET } from './fixtures'
@@ -43,8 +43,9 @@ describe('ETH Cookpit', () => {
     expect(bistro.days[2].hours).toEqual([{ from: '07:00', to: '16:00' }])
     expect(wednesday.services.map(row => [row.service, row.from, row.to, row.dishes.length])).toEqual([['lunch', '11:00', '13:30', 2], ['dinner', '17:30', '19:30', 1]])
     const [curry, grill] = wednesday.services[0].dishes
-    expect(curry).toMatchObject({ line: 'Garden', name: 'Lentil curry', description: 'Rice · Coriander', diet: 'vegan', classes: [], allergens: ['celery'], gluten: false })
-    expect(grill).toMatchObject({ allergens: ['gluten wheat', 'celery'], gluten: true })
+    expect(curry).toMatchObject({ line: 'Garden', name: 'Lentil curry', description: 'Rice · Coriander', diet: 'vegan', classes: [], allergens: ['celery'], gluten: false, lactose: false })
+    expect(grill).toMatchObject({ allergens: ['gluten wheat', 'celery'], gluten: true, lactose: false })
+    expect(wednesday.services[1].dishes[0]).toMatchObject({ allergens: ['milk, lactose', 'celery'], gluten: false, lactose: true })
     expect(curry.image).toBe('https://idapps.ethz.ch/cookpit-pub-services/v1/images/5001?client-id=ethz-wcms')
     expect(grill.image).toBe('')
     expect(curry.prices).toEqual([{ group: 'students', price: 7.5 }, { group: 'internal', price: 10.5 }, { group: 'external', price: 13.5 }])
@@ -137,18 +138,18 @@ describe('filters, opening hours and place pages', () => {
     expect(openState({ from: '11:00', to: '14:00' }, '2026-11-25', new Date(2026, 10, 25, 14, 0))).toBe('closed')
     expect(openState({ from: '11:00', to: '14:00' }, '2026-11-26', new Date(2026, 10, 25, 12, 0))).toBeNull()
   })
-  it('reads Cookpit’s shared prices and gives every group the price that covers it', () => {
+  it('reads Cookpit’s shared prices and orders every price from students to guests', () => {
     const club = parseEthWeek(ETH_ROTAS, facilities, '2026-11-23').find(row => row.name === 'Faculty Club')!
     const [beef] = menuOf(club, '2026-11-25', 'lunch')!.dishes
     expect(beef.prices).toEqual([{ group: 'all', price: 22 }])
-    expect(['students', 'internal', 'external'].map(group => priceFor(beef.prices, group as 'students')?.price)).toEqual([22, 22, 22])
-    expect(pricesWorthListing(beef.prices)).toBe(true)
     const bowl = menuOf(bar, '2026-11-25', 'lunch')!.dishes[1]
     expect(bowl.prices).toEqual([{ group: 'internalStudents', price: 9.5 }, { group: 'external', price: 12 }])
-    expect(['students', 'internal', 'external'].map(group => priceFor(bowl.prices, group as 'students')?.price)).toEqual([9.5, 9.5, 12])
-    const curry = menuOf(hall, '2026-11-25', 'lunch')!.dishes[0]
-    expect(priceFor(curry.prices, 'internal')?.price).toBe(10.5)
-    expect(pricesWorthListing([{ group: 'students', price: 5 }])).toBe(false)
+    expect(pricesInOrder([{ group: 'external', price: 13.5 }, { group: 'students', price: 7.5 }, { group: 'internal', price: 10.5 }]).map(row => row.group)).toEqual(['students', 'internal', 'external'])
+  })
+  it('filters lactose-free from declared allergens', () => {
+    expect(dishesOf(hall, '2026-11-25', 'dinner', { ...NO_FILTERS, lactoseFree: true })).toEqual([])
+    expect(dishesOf(hall, '2026-11-25', 'lunch', { ...NO_FILTERS, lactoseFree: true })).toHaveLength(2)
+    expect(dishesOf(bar, '2026-11-25', 'lunch', { ...NO_FILTERS, lactoseFree: true }).map(dish => dish.name)).toEqual(['Tofu bowl'])
   })
   it('names a place page by its location id and refuses anything else', () => {
     expect(placeInstance('eth:1')).toBe('place:eth:1')

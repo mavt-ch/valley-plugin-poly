@@ -52,13 +52,10 @@
   "filter.vegetarian": "Vegetarisch",
   "filter.vegan": "Vegan",
   "filter.glutenFree": "Glutenfrei",
-  "filter.price": "Preis",
   "filter.clear": "Filter zurücksetzen",
   "empty.filtered": "Kein Menü passt zu den Filtern.",
   "loading.uzh": "Die UZH-Betriebe werden gelesen…",
   "openInNewTab": "In neuem Tab öffnen",
-  "settings.price.title": "Angezeigter Preis",
-  "settings.price.description": "Welchen Preis der Menüplan bei jedem Gericht zeigt: Studierende, Mitarbeitende oder Gäste.",
   "settings.onlyVegetarian.title": "Nur vegetarisch",
   "settings.onlyVegetarian.description": "Nur vegetarische und vegane Menüs zeigen, in den Zahlen der Ortsliste und auf der Seite.",
   "settings.onlyVegan.title": "Nur vegan",
@@ -70,5 +67,8 @@
   "settings.day.title": "Tag",
   "settings.day.description": "Tag und Mahlzeit, die der Menüplan zeigt; ein vergangener Tag wird zu heute.",
   "price.internalStudents": "Mitarbeitende & Studierende",
-  "price.all": "Alle Besucher"
+  "price.all": "Alle Besucher",
+  "filter.lactoseFree": "Laktosefrei",
+  "settings.onlyLactoseFree.title": "Nur laktosefrei",
+  "settings.onlyLactoseFree.description": "Nur Menüs zeigen, deren angegebene Allergene keine Milch enthalten. Ein Menü ohne angegebene Allergene wird nicht gezeigt."
 }
