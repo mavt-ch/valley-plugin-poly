@@ -77,7 +77,7 @@ describe('menu plan panel', () => {
     expect(header.querySelector('.plugin-open-page')?.getAttribute('aria-label')).toBe('Open the menu plan page')
     expect(screen.getByRole('button', { name: 'Lunch' }).getAttribute('aria-pressed')).toBe('true')
     expect(container.querySelectorAll('.study-bar')).toHaveLength(2)
-    expect(tile(/^ETH Zentrum/).textContent).toBe('ETH1')
+    expect(tile(/^ETH Zentrum/).textContent).toBe('ETH2')
     expect(tile(/^ETH Hönggerberg/).getAttribute('aria-pressed')).toBe('true')
     expect(tile(/^ETH Hönggerberg/).textContent).toBe('Höngg1')
     expect(tile(/^UZH outlets/).textContent).toBe('UZH1')
@@ -242,6 +242,20 @@ describe('menu plan page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Dinner' }))
     await settle()
     expect(screen.getByText('No menu matches the filters.')).toBeTruthy()
+  })
+
+  it('shows a price for all visitors whatever group is chosen, listed once in the details', async () => {
+    harness({ price: 'external' }, 'study.page', { instanceId: 'place:eth:6' })
+    await settle()
+    expect(screen.getByText('CHF 22.00')).toBeTruthy()
+    fireEvent.click(screen.getByText('Braised beef'))
+    expect(screen.getByText('All visitors CHF 22.00')).toBeTruthy()
+    cleanup()
+    harness({ price: 'internal' }, 'study.page', { instanceId: 'place:eth:2' })
+    await settle()
+    expect(screen.getByText('CHF 9.50')).toBeTruthy()
+    fireEvent.click(screen.getByText('Tofu bowl'))
+    expect(screen.getByText('Staff & students CHF 9.50 · Guests CHF 12.00')).toBeTruthy()
   })
 
   it('reads one UZH outlet and its dish pages for picture and price', async () => {

@@ -68,5 +68,7 @@
   "settings.campus.title": "Campus",
   "settings.campus.description": "Der im Menüplan gewählte Campus.",
   "settings.day.title": "Tag",
-  "settings.day.description": "Tag und Mahlzeit, die der Menüplan zeigt; ein vergangener Tag wird zu heute."
+  "settings.day.description": "Tag und Mahlzeit, die der Menüplan zeigt; ein vergangener Tag wird zu heute.",
+  "price.internalStudents": "Mitarbeitende & Studierende",
+  "price.all": "Alle Besucher"
 }

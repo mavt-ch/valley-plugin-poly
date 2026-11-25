@@ -10,7 +10,7 @@
 import type { ValleyPluginApi } from '@valley/plugin-sdk'
 import { paletteCssContrast, paletteCssValue } from '@valley/plugin-sdk/palette'
 import {
-  CAMPUSES, addDays, defaultService, dishesOf, formatPrice, hasFilters, isDate, menuOf, mondayOf, openState, openingOf, placeInstance, placeOf, sourceLanguage, today,
+  CAMPUSES, addDays, defaultService, dishesOf, formatPrice, hasFilters, priceFor, pricesWorthListing, isDate, menuOf, mondayOf, openState, openingOf, placeInstance, placeOf, sourceLanguage, today,
   type Campus, type Dish, type DishDetail, type Filters, type Location, type Outlet, type PriceGroup, type Service
 } from './model'
 
@@ -248,7 +248,7 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
   }
   function detailsOf(dish: Dish, prices: DishDetail['prices']) {
     return [
-      prices.length > 1 ? prices.map(row => `${t(`price.${row.group}`)} ${formatPrice(row.price)}`).join(' · ') : '',
+      pricesWorthListing(prices) ? prices.map(row => `${t(`price.${row.group}`)} ${formatPrice(row.price)}`).join(' · ') : '',
       dish.allergens.length ? `${t('allergens')}: ${dish.allergens.join(', ')}` : t('allergens.none')
     ].filter(Boolean)
   }
@@ -266,7 +266,7 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     const source = dish.image || detail.data?.image || ''
     const picture = useAnswer<string>(visible && source ? source : null, 0, () => api.backend.call<string>('image', { url: source }))
     const prices = dish.prices.length ? dish.prices : detail.data?.prices ?? []
-    const price = prices.find(row => row.group === group)
+    const price = priceFor(prices, group)
     return h('button', { ref, type: 'button', className: `study-card${open ? ' open' : ''}`, 'aria-expanded': open, onClick: () => setOpen(!open) },
       h('span', { className: 'study-card-image' },
         h(Icon, { shapes: DISH }),

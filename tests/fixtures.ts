@@ -11,6 +11,7 @@ export const ETH_FACILITIES = {
     { 'facility-id': 1, 'facility-name': 'Test Hall', building: 'HXX', floor: 'E', 'room-nr': '1', 'address-line-3': '8093 Zürich', 'facility-url': 'https://example.test/hall' },
     { 'facility-id': 2, 'facility-name': 'City Bar', building: 'ZZ', floor: 'D', 'address-line-3': '8092 Zürich', 'facility-url': 'https://example.test/bar' },
     { 'facility-id': 3, 'facility-name': 'Ring Bistro', building: 'HYY', floor: 'D', 'address-line-3': '8049 Zürich', 'facility-url': 'https://example.test/bistro' },
+    { 'facility-id': 6, 'facility-name': 'Faculty Club', building: 'QQ', floor: 'K', 'address-line-3': '8092 Zürich', 'facility-url': 'https://example.test/club' },
     { 'facility-id': 4, 'facility-name': 'North Deli', building: 'NN', floor: 'E', 'address-line-3': '8050 Oerlikon', 'facility-url': 'https://example.test/deli' },
     { 'facility-id': 5, 'facility-name': 'Rhine Lounge', building: 'BB', floor: 'K', 'address-line-3': '4056 Basel', 'facility-url': 'https://example.test/lounge' }
   ]
@@ -37,10 +38,13 @@ export const ETH_ROTAS = {
       'day-of-week-array': [{ 'day-of-week-code': 3, 'opening-hour-array': [{ 'time-from': '11:00', 'time-to': '14:00', 'meal-time-array': [
         { name: 'Mittag', 'time-from': '11:30', 'time-to': '13:30', 'line-array': [
           line('Soup', 201, 'Pumpkin soup', '', 16, { 'allergen-array': [] }),
-          line('Bowl', 202, 'Tofu bowl', 'Rice | Greens', 16)
+          line('Bowl', 202, 'Tofu bowl', 'Rice | Greens', 16, { 'meal-price-array': [price(12, 9.5), price(13, 12)] })
         ] }
       ] }] }]
     },
+    { 'facility-id': 6, 'valid-from': '2026-11-23', 'valid-to': '2026-11-29', 'day-of-week-array': [{ 'day-of-week-code': 3, 'opening-hour-array': [{ 'time-from': '11:30', 'time-to': '14:00', 'meal-time-array': [
+      { 'time-from': '11:30', 'time-to': '13:30', 'line-array': [line('Menu', 601, 'Braised beef', 'Polenta | Carrots', 11, { 'meal-price-array': [price(14, 22)] })] }
+    ] }] }] },
     { 'facility-id': 4, 'valid-from': '2026-11-23', 'valid-to': '2026-11-29', 'day-of-week-array': [{ 'day-of-week-code': 3, 'opening-hour-array': [{ 'time-from': '11:00', 'time-to': '14:00', 'meal-time-array': [
       { 'time-from': '11:00', 'time-to': '13:30', 'line-array': [line('Deli', 401, 'Sandwich', '', 11)] }
     ] }] }] },

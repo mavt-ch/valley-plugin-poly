@@ -68,5 +68,7 @@
   "settings.campus.title": "校区",
   "settings.campus.description": "菜单中选择的校区标签。",
   "settings.day.title": "日期",
-  "settings.day.description": "菜单显示的日期和餐次；过去的日期会回到今天。"
+  "settings.day.description": "菜单显示的日期和餐次；过去的日期会回到今天。",
+  "price.internalStudents": "员工和学生",
+  "price.all": "所有访客"
 }

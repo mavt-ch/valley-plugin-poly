@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addDays, defaultService, dishesOf, ethCampus, ethZone, matchesFilters, menuOf, openState, openingOf, placeInstance, placeOf, NO_FILTERS, ethHasGaps, ethMealsById, flightPayload, isHoenggerberg, isoWeek, mondayOf, outletPath, parseEthFacilities, parseEthWeek,
+  addDays, defaultService, dishesOf, priceFor, pricesWorthListing, ethCampus, ethZone, matchesFilters, menuOf, openState, openingOf, placeInstance, placeOf, NO_FILTERS, ethHasGaps, ethMealsById, flightPayload, isHoenggerberg, isoWeek, mondayOf, outletPath, parseEthFacilities, parseEthWeek,
   ethImage, isDishUrl, isImageUrl, parseUzhDish, priceGroupOf, parseUzhAllergenNames, parseUzhOutlet, parseUzhOutlets, parseUzhWeek, payloadProps, sourceLanguage, uzhLocation, weekday
 } from '../src/model'
 import { DISH_IMAGE, ETH_FACILITIES, ETH_ROTAS, ETH_ROTAS_DE, UZH_DINNER, UZH_DISH, UZH_LUNCH, UZH_ORG, UZH_OUTLET } from './fixtures'
@@ -29,8 +29,8 @@ describe('ETH Cookpit', () => {
   it('sorts the facilities into ETH’s zones by postcode and tags Zentrum and Hönggerberg', () => {
     expect(facilities.map(row => row.name)).toEqual(['Test Hall', 'Ring Bistro'])
     expect(facilities[0].place).toBe('HXX E 1')
-    expect(all.map(ethZone)).toEqual(['hoenggerberg', 'zentrum', 'hoenggerberg', 'oerlikon', 'basel'])
-    expect(all.map(ethCampus)).toEqual(['hoengg', 'eth', 'hoengg', null, null])
+    expect(all.map(ethZone)).toEqual(['hoenggerberg', 'zentrum', 'hoenggerberg', 'zentrum', 'oerlikon', 'basel'])
+    expect(all.map(ethCampus)).toEqual(['hoengg', 'eth', 'hoengg', 'eth', null, null])
   })
   it('reads a week into lunch and dinner by meal time, fills "novalue" from German', () => {
     expect(ethHasGaps(ETH_ROTAS)).toBe(true)
@@ -110,6 +110,8 @@ describe('pictures and dish pages', () => {
     expect(priceGroupOf('Employees')).toBe('internal')
     expect(priceGroupOf('Externe')).toBe('external')
     expect(priceGroupOf('Kinder')).toBeNull()
+    expect(priceGroupOf('Alle Besucher')).toBe('all')
+    expect(priceGroupOf('Interne & Studierende')).toBe('internalStudents')
     expect(parseUzhDish(UZH_DISH)).toEqual({ image: DISH_IMAGE, prices: [{ group: 'students', price: 6.1 }, { group: 'internal', price: 9 }, { group: 'external', price: 13 }] })
     expect(parseUzhDish('<html></html>')).toBeNull()
     expect(parseUzhWeek(UZH_LUNCH).get('2026-11-25')![0].detail).toBe('https://app.food2050.ch/de/zfv/universitat-zurich,campus-zentrum/obere-mensa/lunch,menu-1/2026-11-25')
@@ -134,6 +136,19 @@ describe('filters, opening hours and place pages', () => {
     expect(openState({ from: '11:00', to: '14:00' }, '2026-11-25', new Date(2026, 10, 25, 12, 0))).toBe('open')
     expect(openState({ from: '11:00', to: '14:00' }, '2026-11-25', new Date(2026, 10, 25, 14, 0))).toBe('closed')
     expect(openState({ from: '11:00', to: '14:00' }, '2026-11-26', new Date(2026, 10, 25, 12, 0))).toBeNull()
+  })
+  it('reads Cookpit’s shared prices and gives every group the price that covers it', () => {
+    const club = parseEthWeek(ETH_ROTAS, facilities, '2026-11-23').find(row => row.name === 'Faculty Club')!
+    const [beef] = menuOf(club, '2026-11-25', 'lunch')!.dishes
+    expect(beef.prices).toEqual([{ group: 'all', price: 22 }])
+    expect(['students', 'internal', 'external'].map(group => priceFor(beef.prices, group as 'students')?.price)).toEqual([22, 22, 22])
+    expect(pricesWorthListing(beef.prices)).toBe(true)
+    const bowl = menuOf(bar, '2026-11-25', 'lunch')!.dishes[1]
+    expect(bowl.prices).toEqual([{ group: 'internalStudents', price: 9.5 }, { group: 'external', price: 12 }])
+    expect(['students', 'internal', 'external'].map(group => priceFor(bowl.prices, group as 'students')?.price)).toEqual([9.5, 9.5, 12])
+    const curry = menuOf(hall, '2026-11-25', 'lunch')!.dishes[0]
+    expect(priceFor(curry.prices, 'internal')?.price).toBe(10.5)
+    expect(pricesWorthListing([{ group: 'students', price: 5 }])).toBe(false)
   })
   it('names a place page by its location id and refuses anything else', () => {
     expect(placeInstance('eth:1')).toBe('place:eth:1')

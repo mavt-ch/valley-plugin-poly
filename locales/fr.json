@@ -68,5 +68,7 @@
   "settings.campus.title": "Campus",
   "settings.campus.description": "Le campus choisi dans le menu.",
   "settings.day.title": "Jour",
-  "settings.day.description": "Le jour et le repas affichés ; un jour passé revient à aujourd'hui."
+  "settings.day.description": "Le jour et le repas affichés ; un jour passé revient à aujourd'hui.",
+  "price.internalStudents": "Personnel et étudiants",
+  "price.all": "Tous les visiteurs"
 }

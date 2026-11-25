@@ -12,7 +12,15 @@ export type Service = 'lunch' | 'dinner'
 export type PriceGroup = 'students' | 'internal' | 'external'
 export type Climate = 'LOW' | 'MEDIUM' | 'HIGH'
 
-export type Price = { group: PriceGroup; price: number }
+/** Who a price is for: one of the three groups, staff and students together, or every visitor. */
+export type PriceKind = PriceGroup | 'internalStudents' | 'all'
+export type Price = { group: PriceKind; price: number }
+const COVERS: Record<PriceKind, PriceGroup[]> = { students: ['students'], internal: ['internal'], external: ['external'], internalStudents: ['internal', 'students'], all: ['students', 'internal', 'external'] }
+/** The price the chosen group pays: its own price, else a shared price that covers it ("All visitors"). */
+export const priceFor = (prices: Price[], group: PriceGroup): Price | undefined =>
+  prices.find(row => row.group === group) ?? prices.find(row => COVERS[row.group].includes(group))
+/** Whether the price list needs its detail line: more than one price, or one shared price. */
+export const pricesWorthListing = (prices: Price[]) => prices.length > 1 || prices.some(row => COVERS[row.group].length > 1)
 export type Dish = {
   id: string
   line: string
@@ -83,7 +91,8 @@ const text = (value: unknown): string => typeof value === 'string' && value.trim
 const time = (value: unknown): string => typeof value === 'string' && /^\d{2}:\d{2}$/.test(value) ? value : ''
 /** A meal time starting at three or later is dinner, whatever the outlet calls it. */
 const serviceAt = (from: string): Service => from && from >= '15:00' ? 'dinner' : 'lunch'
-const GROUPS: Record<number, PriceGroup> = { 10: 'students', 11: 'internal', 13: 'external' }
+/** Cookpit's customer groups: 10 students, 11 internal, 12 internal & students, 13 external, 14 all visitors. */
+const GROUPS: Record<number, PriceKind> = { 10: 'students', 11: 'internal', 12: 'internalStudents', 13: 'external', 14: 'all' }
 /** Cookpit's allergen code for gluten ("gluten wheat"). */
 const ETH_GLUTEN_CODE = 10
 /** food2050's allergen ids of the gluten cereals. */
@@ -352,8 +361,10 @@ export function parseUzhWeek(html: string): Map<string, Dish[]> {
   return days
 }
 
-/** A price category's name in German or English as one of the three groups. */
-export function priceGroupOf(name: string): PriceGroup | null {
+/** A price category's name in German or English as the group it is for; a shared price ("Alle Besucher") is for everyone. */
+export function priceGroupOf(name: string): PriceKind | null {
+  if (/^(alle|all|everyone|einheitspreis)\b|alle besucher|all visitors/i.test(name.trim())) return 'all'
+  if (/stud/i.test(name) && /mitarbeit|angestellt|personal|staff|employee|intern/i.test(name)) return 'internalStudents'
   if (/stud/i.test(name)) return 'students'
   if (/mitarbeit|angestellt|personal|staff|employee|intern/i.test(name)) return 'internal'
   if (/extern|gäst|gast|guest|visitor|public/i.test(name)) return 'external'

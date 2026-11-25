@@ -68,5 +68,7 @@
   "settings.campus.title": "Campus",
   "settings.campus.description": "La etiqueta de campus elegida en el menú.",
   "settings.day.title": "Día",
-  "settings.day.description": "El día y la comida que muestra el menú; un día pasado vuelve a hoy."
+  "settings.day.description": "El día y la comida que muestra el menú; un día pasado vuelve a hoy.",
+  "price.internalStudents": "Personal y estudiantes",
+  "price.all": "Todos los visitantes"
 }

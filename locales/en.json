@@ -68,5 +68,7 @@
   "settings.campus.title": "Campus",
   "settings.campus.description": "The campus tag chosen in the menu plan.",
   "settings.day.title": "Day",
-  "settings.day.description": "The day and meal the menu plan shows; a past day falls back to today."
+  "settings.day.description": "The day and meal the menu plan shows; a past day falls back to today.",
+  "price.internalStudents": "Staff & students",
+  "price.all": "All visitors"
 }

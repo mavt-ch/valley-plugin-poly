@@ -69,7 +69,7 @@ describe('backend', () => {
   it('reads the ETH Zentrum and Hönggerberg week and fills English gaps from German', async () => {
     const { call, urls } = backend(eth)
     const week = await call<Location[]>('eth.week', { monday: '2026-11-23', language: 'en' })
-    expect(week.map(location => [location.name, location.campus])).toEqual([['Test Hall', 'hoengg'], ['City Bar', 'eth'], ['Ring Bistro', 'hoengg']])
+    expect(week.map(location => [location.name, location.campus])).toEqual([['Test Hall', 'hoengg'], ['City Bar', 'eth'], ['Ring Bistro', 'hoengg'], ['Faculty Club', 'eth']])
     expect(week[0].days[2].services[0].dishes[1].name).toBe('Bratwurst')
     expect(urls.filter(url => url.includes('lang=de'))).toHaveLength(1)
     await call('eth.week', { monday: '2026-11-23', language: 'en' })
