@@ -18,6 +18,37 @@
   "settingsSchema": {
     "fields": [
       {
+        "key": "prices",
+        "label": "Prices shown",
+        "labelKey": "settings.prices.title",
+        "type": "select",
+        "default": "all",
+        "description": "Which prices the menu cards show: all of them from students to guests, or one group's.",
+        "descriptionKey": "settings.prices.description",
+        "options": [
+          {
+            "value": "all",
+            "label": "All prices",
+            "labelKey": "prices.all"
+          },
+          {
+            "value": "students",
+            "label": "Students",
+            "labelKey": "price.students"
+          },
+          {
+            "value": "internal",
+            "label": "Staff",
+            "labelKey": "price.internal"
+          },
+          {
+            "value": "external",
+            "label": "Guests",
+            "labelKey": "price.external"
+          }
+        ]
+      },
+      {
         "key": "onlyVegetarian",
         "label": "Only vegetarian",
         "labelKey": "settings.onlyVegetarian.title",

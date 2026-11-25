@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addDays, defaultService, dishesOf, pricesInOrder, ethCampus, ethZone, matchesFilters, menuOf, openState, openingOf, placeInstance, placeOf, NO_FILTERS, ethHasGaps, ethMealsById, flightPayload, isHoenggerberg, isoWeek, mondayOf, outletPath, parseEthFacilities, parseEthWeek,
+  addDays, defaultService, dishesOf, priceFor, pricesInOrder, ethCampus, ethZone, matchesFilters, menuOf, openState, openingOf, placeInstance, placeOf, NO_FILTERS, ethHasGaps, ethMealsById, flightPayload, isHoenggerberg, isoWeek, mondayOf, outletPath, parseEthFacilities, parseEthWeek,
   ethImage, isDishUrl, isImageUrl, parseUzhDish, priceGroupOf, parseUzhAllergenNames, parseUzhOutlet, parseUzhOutlets, parseUzhWeek, payloadProps, sourceLanguage, uzhLocation, weekday
 } from '../src/model'
 import { DISH_IMAGE, ETH_FACILITIES, ETH_ROTAS, ETH_ROTAS_DE, UZH_DINNER, UZH_DISH, UZH_LUNCH, UZH_ORG, UZH_OUTLET } from './fixtures'
@@ -145,6 +145,9 @@ describe('filters, opening hours and place pages', () => {
     const bowl = menuOf(bar, '2026-11-25', 'lunch')!.dishes[1]
     expect(bowl.prices).toEqual([{ group: 'internalStudents', price: 9.5 }, { group: 'external', price: 12 }])
     expect(pricesInOrder([{ group: 'external', price: 13.5 }, { group: 'students', price: 7.5 }, { group: 'internal', price: 10.5 }]).map(row => row.group)).toEqual(['students', 'internal', 'external'])
+    expect(['students', 'internal', 'external'].map(group => priceFor(beef.prices, group as 'students')?.price)).toEqual([22, 22, 22])
+    expect(['students', 'internal', 'external'].map(group => priceFor(bowl.prices, group as 'students')?.price)).toEqual([9.5, 9.5, 12])
+    expect(priceFor([{ group: 'students', price: 5 }], 'external')).toBeUndefined()
   })
   it('filters lactose-free from declared allergens', () => {
     expect(dishesOf(hall, '2026-11-25', 'dinner', { ...NO_FILTERS, lactoseFree: true })).toEqual([])

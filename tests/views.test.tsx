@@ -254,6 +254,38 @@ describe('menu plan page', () => {
     expect(screen.getByText('No menu matches the filters.')).toBeTruthy()
   })
 
+  it('picks whose prices the cards show from the price button beside the filter', async () => {
+    const { menu, settings, container } = harness()
+    await settle()
+    const button = screen.getByRole('button', { name: 'Prices · All prices' })
+    expect(button.nextElementSibling?.getAttribute('aria-label')).toBe('Filter')
+    menu.mockResolvedValueOnce('internal')
+    fireEvent.click(button)
+    await settle()
+    const items = (menu.mock.calls[0] as unknown as [{ id?: string; checked?: boolean }[]])[0]
+    expect(items.map(item => item.id ?? '—')).toEqual(['all', '—', 'students', 'internal', 'external'])
+    expect(items[0].checked).toBe(true)
+    expect(settings.prices).toBe('internal')
+    expect(screen.getByRole('button', { name: 'Prices · Staff' }).className).toContain('active')
+    expect(container).toBeTruthy()
+  })
+
+  it('shows only the chosen group’s price on the cards, a shared price when that is what it pays', async () => {
+    const { container } = harness({ prices: 'internal' }, 'study.page', { instanceId: 'place:eth:1' })
+    await settle()
+    const price = container.querySelector('[data-dish="eth:102"] .study-dish-price')!
+    expect(price.textContent).toBe('CHF 10.50')
+    expect(price.getAttribute('title')).toBe('Staff CHF 10.50')
+    cleanup()
+    harness({ prices: 'students' }, 'study.page', { instanceId: 'place:eth:6' })
+    await settle()
+    expect(screen.getByText('CHF 22.00').getAttribute('title')).toBe('All visitors CHF 22.00')
+    cleanup()
+    harness({ prices: 'external' }, 'study.page', { instanceId: 'place:eth:2' })
+    await settle()
+    expect(screen.getByText('CHF 12.00').getAttribute('title')).toBe('Guests CHF 12.00')
+  })
+
   it('shows a shared price once, named in its tooltip', async () => {
     harness({}, 'study.page', { instanceId: 'place:eth:6' })
     await settle()

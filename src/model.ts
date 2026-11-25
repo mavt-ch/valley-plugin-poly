@@ -18,6 +18,10 @@ export type Price = { group: PriceKind; price: number }
 const PRICE_ORDER: PriceKind[] = ['students', 'internalStudents', 'internal', 'external', 'all']
 /** A dish's prices from students to guests, the order the card shows them in ("CHF 7.90 / 10.90 / 13.90"). */
 export const pricesInOrder = (prices: Price[]) => [...prices].sort((a, b) => PRICE_ORDER.indexOf(a.group) - PRICE_ORDER.indexOf(b.group))
+const COVERS: Record<PriceKind, PriceGroup[]> = { students: ['students'], internal: ['internal'], external: ['external'], internalStudents: ['internal', 'students'], all: ['students', 'internal', 'external'] }
+/** The price a group pays: its own price, else a shared price that covers it ("All visitors", "Staff & students"). */
+export const priceFor = (prices: Price[], group: PriceGroup): Price | undefined =>
+  prices.find(row => row.group === group) ?? prices.find(row => COVERS[row.group].includes(group))
 export type Dish = {
   id: string
   line: string

@@ -70,5 +70,9 @@
   "price.all": "所有访客",
   "filter.lactoseFree": "无乳糖",
   "settings.onlyLactoseFree.title": "仅无乳糖",
-  "settings.onlyLactoseFree.description": "仅显示已声明过敏原中不含牛奶的菜单。未声明过敏原的菜单不显示。"
+  "settings.onlyLactoseFree.description": "仅显示已声明过敏原中不含牛奶的菜单。未声明过敏原的菜单不显示。",
+  "prices": "价格",
+  "prices.all": "所有价格",
+  "settings.prices.title": "显示的价格",
+  "settings.prices.description": "菜单卡片显示的价格：从学生到访客的全部价格，或某一组的价格。"
 }

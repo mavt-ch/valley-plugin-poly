@@ -70,5 +70,9 @@
   "price.all": "Alle Besucher",
   "filter.lactoseFree": "Laktosefrei",
   "settings.onlyLactoseFree.title": "Nur laktosefrei",
-  "settings.onlyLactoseFree.description": "Nur Menüs zeigen, deren angegebene Allergene keine Milch enthalten. Ein Menü ohne angegebene Allergene wird nicht gezeigt."
+  "settings.onlyLactoseFree.description": "Nur Menüs zeigen, deren angegebene Allergene keine Milch enthalten. Ein Menü ohne angegebene Allergene wird nicht gezeigt.",
+  "prices": "Preise",
+  "prices.all": "Alle Preise",
+  "settings.prices.title": "Angezeigte Preise",
+  "settings.prices.description": "Welche Preise die Menükarten zeigen: alle, von Studierenden bis Gäste, oder die einer Gruppe."
 }

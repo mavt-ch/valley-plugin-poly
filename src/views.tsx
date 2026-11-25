@@ -10,8 +10,8 @@
 import type { ValleyPluginApi } from '@valley/plugin-sdk'
 import { paletteCssContrast, paletteCssValue } from '@valley/plugin-sdk/palette'
 import {
-  CAMPUSES, addDays, defaultService, dishesOf, formatPrice, hasFilters, pricesInOrder, isDate, menuOf, mondayOf, openState, openingOf, placeInstance, placeOf, sourceLanguage, today,
-  type Campus, type Dish, type DishDetail, type Filters, type Location, type Outlet, type Price, type Service
+  CAMPUSES, addDays, defaultService, dishesOf, formatPrice, hasFilters, priceFor, pricesInOrder, isDate, menuOf, mondayOf, openState, openingOf, placeInstance, placeOf, sourceLanguage, today,
+  type Campus, type Dish, type DishDetail, type Filters, type Location, type Outlet, type Price, type PriceGroup, type Service
 } from './model'
 
 export const VIEWS_CSS = `
@@ -120,6 +120,7 @@ const OPEN: Shapes = ['M14 4h6v6', 'M20 4l-9 9', 'M18 14v5a1 1 0 0 1-1 1H5a1 1 0
 const TAB: Shapes = ['M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z', 'M4 9h16', 'M10 4v5']
 const DISH: Shapes = ['M6 3v7a2 2 0 0 0 2 2a2 2 0 0 0 2-2V3', 'M8 3v18', 'M17 21V3c-2.2 1.2-3.5 3.8-3.5 7.2V13a1 1 0 0 0 1 1H17']
 const FILTER: Shapes = ['M4 5h16l-6 7.5V19l-4 1.5v-8z']
+const CASH: Shapes = ['M3 7a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z', 'M9.5 12a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0', 'M6 9.5v.01', 'M18 14.5v.01']
 /** ETH Zentrum: the main building's columns; Höngg: the hill; UZH: a book. */
 const CAMPUS_ICONS: Record<Campus, Shapes> = {
   eth: ['M3 21h18', 'M4 10h16', 'M12 3l8 5H4z', 'M6 10v8', 'M10 10v8', 'M14 10v8', 'M18 10v8', 'M4 18h16'],
@@ -128,6 +129,9 @@ const CAMPUS_ICONS: Record<Campus, Shapes> = {
 }
 const CAMPUS_COLORS: Record<Campus, string> = { eth: 'palette:primary-blue', hoengg: 'palette:green', uzh: 'palette:violet' }
 /** The diet filters in the menu's two groups: what the dish is, then what it leaves out. */
+/** Whose prices the cards show: every price, or one group's. */
+type PriceShown = 'all' | PriceGroup
+const PRICE_CHOICES: PriceShown[] = ['all', 'students', 'internal', 'external']
 const FILTER_KEYS = [['vegetarian', 'onlyVegetarian'], ['vegan', 'onlyVegan'], ['glutenFree', 'onlyGlutenFree'], ['lactoseFree', 'onlyLactoseFree']] as const
 
 type State<T> = { data: T | null; error: string; loading: boolean }
@@ -164,6 +168,7 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
       language: sourceLanguage(api.ui.language()),
       locale: api.ui.language() || 'en',
       campus: (CAMPUSES.includes(settings.campus as Campus) ? settings.campus : 'hoengg') as Campus,
+      prices: (PRICE_CHOICES.includes(settings.prices as PriceShown) ? settings.prices : 'all') as PriceShown,
       filters: { vegetarian: settings.onlyVegetarian === true, vegan: settings.onlyVegan === true, glutenFree: settings.onlyGlutenFree === true, lactoseFree: settings.onlyLactoseFree === true } as Filters,
       ...dayOf(settings.day)
     }
@@ -249,9 +254,13 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
       ...(dish.climate ? [{ key: dish.climate, label: t(`climate.${dish.climate}`) }] : [])
     ]
   }
-  /** Every price on one line, students to guests ("CHF 7.90 / 10.90 / 13.90"); the tooltip names each group. */
-  function priceLine(prices: Price[]) {
-    const ordered = pricesInOrder(prices)
+  /**
+   * Every price on one line, students to guests ("CHF 7.90 / 10.90 / 13.90"), or only the chosen
+   * group's price (its own, else a shared price covering it); the tooltip names the groups.
+   */
+  function priceLine(prices: Price[], shown: PriceShown) {
+    const own = shown === 'all' ? undefined : priceFor(prices, shown)
+    const ordered = shown === 'all' ? pricesInOrder(prices) : own ? [own] : []
     return {
       short: ordered.length ? `CHF ${ordered.map(row => row.price.toFixed(2)).join(' / ')}` : '',
       long: ordered.map(row => `${t(`price.${row.group}`)} ${formatPrice(row.price)}`).join(' · ')
@@ -267,14 +276,14 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
    * line and all prices, name, description, allergens, then the tags. For UZH the picture and prices
    * come from the dish's own page.
    */
-  function DishCard({ dish, revision }: { dish: Dish; revision: number }): Node {
+  function DishCard({ dish, shown, revision }: { dish: Dish; shown: PriceShown; revision: number }): Node {
     const ref = React.useRef<HTMLDivElement>(null)
     const visible = useVisible(ref)
     const detail = useAnswer<DishDetail>(visible && dish.detail ? dish.detail : null, revision, fresh => api.backend.call<DishDetail>('uzh.dish', { url: dish.detail, fresh }))
     const source = dish.image || detail.data?.image || ''
     const picture = useAnswer<string>(visible && source ? source : null, 0, () => api.backend.call<string>('image', { url: source }))
     const prices = dish.prices.length ? dish.prices : detail.data?.prices ?? []
-    const price = priceLine(prices)
+    const price = priceLine(prices, shown)
     return h('div', { ref, className: 'study-card', 'data-dish': dish.id },
       h('span', { className: 'study-card-image' },
         h(Icon, { shapes: DISH }),
@@ -313,6 +322,20 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     if (choice === 'tab') openPlace(location, true)
     if (choice === 'website' && location.url) void api.links.open(location.url)
     if (choice === 'refresh') refresh()
+  }
+
+  /** Whose prices the cards show, beside the filter: all of them, or students', staff's or guests'. */
+  function PriceButton({ preferences }: { preferences: Preferences }): Node {
+    const active = preferences.prices !== 'all'
+    const pick = async (event: MouseEvent) => {
+      const choice = await api.ui.openMenu(PRICE_CHOICES.flatMap((value, index) => [
+        ...(index === 1 ? [{ type: 'separator' as const }] : []),
+        { id: value, type: 'radio' as const, label: t(value === 'all' ? 'prices.all' : `price.${value}`), checked: preferences.prices === value }
+      ]), { anchor: event.currentTarget as HTMLElement, align: 'end' })
+      if (choice && PRICE_CHOICES.includes(choice as PriceShown)) void api.settings.set('prices', choice)
+    }
+    const label = `${t('prices')} · ${t(active ? `price.${preferences.prices}` : 'prices.all')}`
+    return h('button', { type: 'button', className: `study-icon-btn${active ? ' active' : ''}`, title: label, 'aria-label': label, 'aria-haspopup': 'menu', onClick: pick }, h(Icon, { shapes: CASH }))
   }
 
   /** The diet filters, as a header filter menu. */
@@ -436,7 +459,7 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
             onAuxClick: (event: MouseEvent) => { if (event.button === 1) { event.preventDefault(); openOverview(true) } }
           }))),
       h(Tiles, { places, visible, active }),
-      h('div', { className: 'study-bar' }, h(DayNav, { preferences }), h(FilterButton, { preferences })),
+      h('div', { className: 'study-bar' }, h(DayNav, { preferences }), h(PriceButton, { preferences }), h(FilterButton, { preferences })),
       h('div', { className: 'study-list' },
         h(PlaceList, { places, campus: active, preferences, refresh }),
         h('div', { className: 'study-credit' }, t(active === 'uzh' ? 'credit.uzh' : 'credit.eth'))))
@@ -445,7 +468,7 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
   function Cards({ location, preferences, revision }: { location: Location; preferences: Preferences; revision: number }): Node {
     const dishes = dishesOf(location, preferences.date, preferences.service, preferences.filters)
     if (!dishes.length) return h('div', { className: 'study-note' }, menuOf(location, preferences.date, preferences.service) ? t('empty.filtered') : t('empty.location'))
-    return h('div', { className: 'study-cards' }, dishes.map(dish => h(DishCard, { key: dish.id, dish, revision })))
+    return h('div', { className: 'study-cards' }, dishes.map(dish => h(DishCard, { key: dish.id, dish, shown: preferences.prices, revision })))
   }
 
   function PlaceFacts({ location, preferences }: { location: Location; preferences: Preferences }): Node {
