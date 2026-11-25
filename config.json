@@ -18,13 +18,13 @@
   "settingsSchema": {
     "fields": [
       {
-        "key": "priceGroup",
-        "label": "Prices for",
-        "labelKey": "settings.priceGroup.title",
+        "key": "price",
+        "label": "Price shown",
+        "labelKey": "settings.price.title",
         "type": "select",
         "default": "students",
-        "description": "Which price the menu plan shows beside each dish.",
-        "descriptionKey": "settings.priceGroup.description",
+        "description": "Which price the menu plan shows on each dish: students, staff or guests.",
+        "descriptionKey": "settings.price.description",
         "options": [
           {
             "value": "students",
@@ -44,55 +44,73 @@
         ]
       },
       {
-        "key": "source",
-        "label": "University",
-        "labelKey": "settings.source.title",
+        "key": "onlyVegetarian",
+        "label": "Only vegetarian",
+        "labelKey": "settings.onlyVegetarian.title",
+        "type": "boolean",
+        "default": false,
+        "description": "Show only vegetarian and vegan menus, in the place list counts and on the page.",
+        "descriptionKey": "settings.onlyVegetarian.description"
+      },
+      {
+        "key": "onlyVegan",
+        "label": "Only vegan",
+        "labelKey": "settings.onlyVegan.title",
+        "type": "boolean",
+        "default": false,
+        "description": "Show only vegan menus.",
+        "descriptionKey": "settings.onlyVegan.description"
+      },
+      {
+        "key": "onlyGlutenFree",
+        "label": "Only gluten-free",
+        "labelKey": "settings.onlyGlutenFree.title",
+        "type": "boolean",
+        "default": false,
+        "description": "Show only menus whose declared allergens contain no gluten cereal. A menu without declared allergens is not shown.",
+        "descriptionKey": "settings.onlyGlutenFree.description"
+      },
+      {
+        "key": "campus",
+        "label": "Campus",
+        "labelKey": "settings.campus.title",
         "type": "custom",
         "settingsVisible": false,
-        "default": "eth",
-        "description": "The university the menu plan shows.",
-        "descriptionKey": "settings.source.description",
+        "default": "hoengg",
+        "description": "The campus tag chosen in the menu plan.",
+        "descriptionKey": "settings.campus.description",
         "schema": {
           "type": "string",
           "enum": [
             "eth",
+            "hoengg",
             "uzh"
           ]
         }
       },
       {
-        "key": "opened",
-        "label": "Opened outlets",
-        "labelKey": "settings.opened.title",
+        "key": "day",
+        "label": "Day",
+        "labelKey": "settings.day.title",
         "type": "custom",
         "settingsVisible": false,
-        "default": [],
-        "description": "Outlets of the menu plan opened by hand.",
-        "descriptionKey": "settings.opened.description",
+        "default": {},
+        "description": "The day and meal the menu plan shows; a past day falls back to today.",
+        "descriptionKey": "settings.day.description",
         "schema": {
-          "type": "array",
-          "maxItems": 200,
-          "items": {
-            "type": "string",
-            "maxLength": 200
-          }
-        }
-      },
-      {
-        "key": "folded",
-        "label": "Folded outlets",
-        "labelKey": "settings.folded.title",
-        "type": "custom",
-        "settingsVisible": false,
-        "default": [],
-        "description": "Outlets of the menu plan folded by hand.",
-        "descriptionKey": "settings.folded.description",
-        "schema": {
-          "type": "array",
-          "maxItems": 200,
-          "items": {
-            "type": "string",
-            "maxLength": 200
+          "type": "object",
+          "properties": {
+            "date": {
+              "type": "string",
+              "maxLength": 10
+            },
+            "service": {
+              "type": "string",
+              "enum": [
+                "lunch",
+                "dinner"
+              ]
+            }
           }
         }
       }

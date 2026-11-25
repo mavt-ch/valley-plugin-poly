@@ -66,10 +66,10 @@ describe('backend', () => {
     await expect(call('uzh.dish', { url: 'https://evil.test/x' })).rejects.toThrow('invalidInput')
   })
 
-  it('reads the ETH Hönggerberg week and fills English gaps from German', async () => {
+  it('reads the ETH Zentrum and Hönggerberg week and fills English gaps from German', async () => {
     const { call, urls } = backend(eth)
     const week = await call<Location[]>('eth.week', { monday: '2026-11-23', language: 'en' })
-    expect(week.map(location => location.name)).toEqual(['Test Hall', 'Ring Bistro'])
+    expect(week.map(location => [location.name, location.campus])).toEqual([['Test Hall', 'hoengg'], ['City Bar', 'eth'], ['Ring Bistro', 'hoengg']])
     expect(week[0].days[2].services[0].dishes[1].name).toBe('Bratwurst')
     expect(urls.filter(url => url.includes('lang=de'))).toHaveLength(1)
     await call('eth.week', { monday: '2026-11-23', language: 'en' })
@@ -85,6 +85,37 @@ describe('backend', () => {
     const location = await call<Location>('uzh.week', { path: outlets[0].path, monday: '2026-11-23', language: 'de' })
     expect(location.days[2].services.map(row => row.service)).toEqual(['lunch', 'dinner'])
     expect(location.days[2].services[0].dishes[0].allergens).toEqual(['Glutenhaltiges Getreide'])
+    expect(location.days[2].services[0].dishes[0].gluten).toBe(true)
+  })
+
+  it('keeps an outlet page for 12 hours and queues the place list’s reads behind the page’s', async () => {
+    const { call, fetch, urls } = backend(uzh)
+    const outlets = await call<Outlet[]>('uzh.outlets', { language: 'de' })
+    await call('uzh.week', { path: outlets[0].path, monday: '2026-11-23', language: 'de', background: true })
+    await call('uzh.week', { path: outlets[0].path, monday: '2026-11-23', language: 'de', background: true, fresh: true })
+    expect(urls.filter(url => url.endsWith('/obere-mensa'))).toHaveLength(2)
+    const started: string[] = []
+    const releases: (() => void)[] = []
+    fetch.mockImplementation(async ({ url }: { url: string }) => {
+      started.push(url)
+      await new Promise<void>(resolve => releases.push(resolve))
+      return { status: 404, headers: {}, bodyBase64: '' }
+    })
+    const tick = () => new Promise(resolve => setTimeout(resolve, 0))
+    const reads = [
+      call('uzh.week', { path: outlets[1].path, monday: '2026-11-23', language: 'de', background: true }),
+      call('uzh.week', { path: outlets[1].path, monday: '2026-11-30', language: 'de', background: true }),
+      call('uzh.week', { path: outlets[1].path, monday: '2026-12-07', language: 'de', background: true, fresh: true })
+    ].map(read => read.catch(() => null))
+    await tick()
+    const picture = call('image', { url: DISH_IMAGE }).catch(() => null)
+    await tick()
+    expect(started).toHaveLength(2)
+    releases.shift()!()
+    await tick(); await tick()
+    expect(started[2]).toBe(DISH_IMAGE)
+    while (releases.length) { releases.shift()!(); await tick(); await tick() }
+    await Promise.all([...reads, picture])
   })
 
   it('refuses unknown outlets, wrong dates and languages', async () => {

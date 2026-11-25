@@ -1,8 +1,8 @@
 import type { PluginBackendApi } from '@valley/plugin-sdk'
 import {
-  ETH_BASE, ETH_CLIENT, UZH_ORGANISATION, ethHasGaps, ethMealsById, isDate, isHoenggerberg, isOutletPath, parseEthFacilities, parseEthWeek,
+  ETH_BASE, ETH_CLIENT, UZH_ORGANISATION, ethCampus, ethHasGaps, ethMealsById, isDate, isOutletPath, parseEthFacilities, parseEthWeek,
   isDishUrl, isImageUrl, parseUzhAllergenNames, parseUzhDish, parseUzhOutlet, parseUzhOutlets, parseUzhWeek, isoWeek, addDays, uzhLocation, uzhUrl, weekday,
-  type DishDetail, type EthFacility, type Location, type Outlet, type Service, type Dish
+  type DishDetail, type EthFacility, type Location, type Outlet, type Service, type Dish, type UzhOutletPage
 } from '../model'
 
 const MENU_TTL = 30 * 60_000
@@ -32,16 +32,17 @@ export function register(api: PluginBackendApi): () => Promise<void> {
   const memo = new Map<string, { at: number; ttl: number; value: Promise<unknown> }>()
   let disposed = false
   let running = 0
-  const waiting: (() => void)[] = []
-  const slot = async () => {
-    while (running >= MAX_PARALLEL) await new Promise<void>(resolve => waiting.push(resolve))
+  /** Requests of the open page and its pictures go first; the place list's reads of every outlet wait behind them. */
+  const waiting: { urgent: (() => void)[]; background: (() => void)[] } = { urgent: [], background: [] }
+  const slot = async (background: boolean) => {
+    while (running >= MAX_PARALLEL) await new Promise<void>(resolve => waiting[background ? 'background' : 'urgent'].push(resolve))
     running++
-    return () => { running--; waiting.shift()?.() }
+    return () => { running--; (waiting.urgent.shift() ?? waiting.background.shift())?.() }
   }
 
-  const fetchRaw = async (url: string, accept: string) => {
+  const fetchRaw = async (url: string, accept: string, background = false) => {
     if (disposed) throw new Error('unavailable')
-    const release = await slot()
+    const release = await slot(background)
     const requestId = crypto.randomUUID()
     requests.add(requestId)
     try {
@@ -56,12 +57,12 @@ export function register(api: PluginBackendApi): () => Promise<void> {
       throw new Error('networkError')
     } finally { requests.delete(requestId); release() }
   }
-  const get = async (url: string, accept: string): Promise<string> => decode((await fetchRaw(url, accept)).bodyBase64)
+  const get = async (url: string, accept: string, background = false): Promise<string> => decode((await fetchRaw(url, accept, background)).bodyBase64)
   const json = async (url: string): Promise<unknown> => {
     const body = await get(url, 'application/json')
     try { return JSON.parse(body) } catch { throw new Error('formatError') }
   }
-  const html = (url: string) => get(url, 'text/html')
+  const html = (url: string, background = false) => get(url, 'text/html', background)
 
   /** One answer per key while it is fresh; a failed answer is forgotten at once. */
   const remember = <T>(key: string, ttl: number, fresh: boolean, load: () => Promise<T>): Promise<T> => {
@@ -109,12 +110,12 @@ export function register(api: PluginBackendApi): () => Promise<void> {
     `${ETH_BASE}/${path}?${new URLSearchParams({ 'client-id': ETH_CLIENT, lang, ...query })}`
 
   const ethFacilities = (lang: string, fresh: boolean) => remember(`eth:facilities:${lang}`, LIST_TTL, fresh, async (): Promise<EthFacility[]> =>
-    parseEthFacilities(await json(eth('facilities', lang, { 'rs-first': '0', 'rs-size': '200' }))).filter(isHoenggerberg))
+    parseEthFacilities(await json(eth('facilities', lang, { 'rs-first': '0', 'rs-size': '200' }))).filter(facility => ethCampus(facility) !== null))
 
   const ethRotas = (lang: string, week: string, fresh: boolean) => remember(`eth:rotas:${lang}:${week}`, MENU_TTL, fresh, () =>
     json(eth('weeklyrotas', lang, { 'rs-first': '0', 'rs-size': '200', 'valid-after': week, 'valid-before': addDays(week, 7) })))
 
-  /** The Hönggerberg outlets of ETH for the week starting `monday`. */
+  /** The ETH outlets of Zentrum and Hönggerberg for the week starting `monday`, each with its campus tag. */
   const ethWeek = async (raw: unknown): Promise<Location[]> => {
     const value = input(raw), lang = language(value.language), week = monday(value.monday), fresh = value.fresh === true
     const [facilities, body] = await Promise.all([ethFacilities(lang, fresh), ethRotas(lang, week, fresh)])
@@ -135,21 +136,30 @@ export function register(api: PluginBackendApi): () => Promise<void> {
     return uzhOutlets(language(value.language), value.fresh === true)
   }
 
-  /** One UZH outlet for the week starting `monday`: its lunch and dinner categories, each read from its weekly page. */
+  /** An outlet's page (address, meal categories), which rarely changes. */
+  const uzhOutlet = (lang: string, path: string, fresh: boolean, background: boolean) => remember(`uzh:outlet:${lang}:${path}`, LIST_TTL, fresh, async (): Promise<UzhOutletPage> => {
+    const page = parseUzhOutlet(await html(uzhUrl(lang, path), background))
+    if (!page) throw new Error('formatError')
+    return page
+  })
+
+  /**
+   * One UZH outlet for the week starting `monday`: its lunch and dinner categories, each read from
+   * its weekly page. `background: true` (the place list reading every outlet) queues behind other reads.
+   */
   const uzhWeek = async (raw: unknown): Promise<Location> => {
-    const value = input(raw), lang = language(value.language), week = monday(value.monday), fresh = value.fresh === true
+    const value = input(raw), lang = language(value.language), week = monday(value.monday), fresh = value.fresh === true, background = value.background === true
     if (!isOutletPath(value.path)) throw new Error('invalidInput')
     const path = value.path
     const outlet = (await uzhOutlets(lang, false)).find(row => row.path === path)
     if (!outlet) throw new Error('invalidInput')
     return remember(`uzh:week:${lang}:${path}:${week}`, MENU_TTL, fresh, async () => {
-      const page = parseUzhOutlet(await html(uzhUrl(lang, path)))
-      if (!page) throw new Error('formatError')
+      const page = await uzhOutlet(lang, path, fresh, background)
       const { week: number, year } = isoWeek(week)
       let names: Record<string, string> = {}
       const weeks: { service: Service; days: Map<string, Dish[]> }[] = []
       for (const category of page.categories) {
-        const body = await html(`${uzhUrl(lang, path)}/${category.slug}/menu/weekly?${new URLSearchParams({ week: String(number), year: String(year) })}`)
+        const body = await html(`${uzhUrl(lang, path)}/${category.slug}/menu/weekly?${new URLSearchParams({ week: String(number), year: String(year) })}`, background)
         if (!Object.keys(names).length) names = parseUzhAllergenNames(body)
         weeks.push({ service: category.service, days: parseUzhWeek(body) })
       }

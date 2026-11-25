@@ -2,8 +2,8 @@
   "apiVersion": 5,
   "id": "study",
   "name": "Study",
-  "version": "1.0.0",
-  "description": "Study tools for ETH and UZH students, starting with today's menu plan of ETH Hönggerberg and the UZH mensas.",
+  "version": "1.1.0",
+  "description": "Study tools for ETH and UZH students, starting with today's menu plan of ETH Zentrum, ETH Hönggerberg and the UZH outlets.",
   "author": [
     "mavt"
   ],

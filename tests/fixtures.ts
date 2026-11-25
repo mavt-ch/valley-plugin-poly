@@ -10,7 +10,9 @@ export const ETH_FACILITIES = {
   'facility-array': [
     { 'facility-id': 1, 'facility-name': 'Test Hall', building: 'HXX', floor: 'E', 'room-nr': '1', 'address-line-3': '8093 Zürich', 'facility-url': 'https://example.test/hall' },
     { 'facility-id': 2, 'facility-name': 'City Bar', building: 'ZZ', floor: 'D', 'address-line-3': '8092 Zürich', 'facility-url': 'https://example.test/bar' },
-    { 'facility-id': 3, 'facility-name': 'Ring Bistro', building: 'HYY', floor: 'D', 'address-line-3': '8049 Zürich', 'facility-url': 'https://example.test/bistro' }
+    { 'facility-id': 3, 'facility-name': 'Ring Bistro', building: 'HYY', floor: 'D', 'address-line-3': '8049 Zürich', 'facility-url': 'https://example.test/bistro' },
+    { 'facility-id': 4, 'facility-name': 'North Deli', building: 'NN', floor: 'E', 'address-line-3': '8050 Oerlikon', 'facility-url': 'https://example.test/deli' },
+    { 'facility-id': 5, 'facility-name': 'Rhine Lounge', building: 'BB', floor: 'K', 'address-line-3': '4056 Basel', 'facility-url': 'https://example.test/lounge' }
   ]
 }
 
@@ -22,7 +24,7 @@ export const ETH_ROTAS = {
         { 'day-of-week-code': 3, 'opening-hour-array': [{ 'time-from': '11:00', 'time-to': '20:00', 'meal-time-array': [
           { name: 'Mittag', 'time-from': '11:00', 'time-to': '13:30', 'line-array': [
             line('Garden', 101, 'Lentil curry', 'Rice | Coriander', 16, { 'image-url': 'https://idapps.ethz.ch/cookpit-pub-services/v1/images/5001' }),
-            line('Grill', 102, 'novalue', 'novalue', 11),
+            line('Grill', 102, 'novalue', 'novalue', 11, { 'allergen-array': [{ code: 10, desc: 'gluten wheat' }, { code: 18, desc: 'celery' }] }),
             { name: 'Closed line' }
           ] },
           { name: 'Abend', 'time-from': '17:30', 'time-to': '19:30', 'line-array': [line('Evening', 103, 'Pasta al forno', 'Tomato | Basil', 17)] }
@@ -30,6 +32,18 @@ export const ETH_ROTAS = {
         { 'day-of-week-code': 6 }
       ]
     },
+    {
+      'facility-id': 2, 'valid-from': '2026-11-16', 'valid-to': '2026-11-29',
+      'day-of-week-array': [{ 'day-of-week-code': 3, 'opening-hour-array': [{ 'time-from': '11:00', 'time-to': '14:00', 'meal-time-array': [
+        { name: 'Mittag', 'time-from': '11:30', 'time-to': '13:30', 'line-array': [
+          line('Soup', 201, 'Pumpkin soup', '', 16, { 'allergen-array': [] }),
+          line('Bowl', 202, 'Tofu bowl', 'Rice | Greens', 16)
+        ] }
+      ] }] }]
+    },
+    { 'facility-id': 4, 'valid-from': '2026-11-23', 'valid-to': '2026-11-29', 'day-of-week-array': [{ 'day-of-week-code': 3, 'opening-hour-array': [{ 'time-from': '11:00', 'time-to': '14:00', 'meal-time-array': [
+      { 'time-from': '11:00', 'time-to': '13:30', 'line-array': [line('Deli', 401, 'Sandwich', '', 11)] }
+    ] }] }] },
     { 'facility-id': 3, 'valid-from': '2026-09-14', 'valid-to': '2026-12-20', 'day-of-week-array': [{ 'day-of-week-code': 3, 'opening-hour-array': [{ 'time-from': '07:00', 'time-to': '16:00' }] }] }
   ]
 }

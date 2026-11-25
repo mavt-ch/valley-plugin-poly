@@ -5,6 +5,9 @@
  */
 
 export type Source = 'eth' | 'uzh'
+/** The menu plan's campus tags: ETH Zentrum, ETH Hönggerberg and the UZH outlets. */
+export type Campus = 'eth' | 'hoengg' | 'uzh'
+export const CAMPUSES: Campus[] = ['eth', 'hoengg', 'uzh']
 export type Service = 'lunch' | 'dinner'
 export type PriceGroup = 'students' | 'internal' | 'external'
 export type Climate = 'LOW' | 'MEDIUM' | 'HIGH'
@@ -20,6 +23,8 @@ export type Dish = {
   prices: Price[]
   allergens: string[]
   climate: Climate | null
+  /** True when a declared allergen is a gluten cereal, false when allergens are declared without one, null when none are declared. */
+  gluten: boolean | null
   /** The dish picture's address at its source ('' when it has none). */
   image: string
   /** food2050's page of this dish, which holds its picture and prices ('' for ETH). */
@@ -27,8 +32,11 @@ export type Dish = {
 }
 export type DishDetail = { image: string; prices: Price[] }
 export type ServiceMenu = { service: Service; from: string; to: string; dishes: Dish[] }
-export type DayMenu = { date: string; services: ServiceMenu[] }
-export type Location = { id: string; source: Source; name: string; place: string; url: string; days: DayMenu[] }
+export type Hours = { from: string; to: string }
+/** `hours` are the place's opening hours that day, when its source publishes them (ETH only). */
+export type DayMenu = { date: string; hours: Hours[]; services: ServiceMenu[] }
+/** `place` is the building and floor (ETH) or the street address (UZH); `area` the UZH campus. */
+export type Location = { id: string; source: Source; campus: Campus; name: string; place: string; area: string; url: string; days: DayMenu[] }
 export type Outlet = { path: string; name: string; campus: string }
 
 export const ETH_HOST = 'idapps.ethz.ch'
@@ -43,6 +51,8 @@ export const ETH_WEBSITE = 'https://ethz.ch/de/campus/erleben/gastronomie-und-ei
 export const UZH_WEBSITE = 'https://www.mensa.uzh.ch/de/Standorte-und-Verpflegung.html'
 /** Postcodes ETH's gastronomy page files under Hönggerberg (its own location rule). */
 export const HOENGGERBERG_POSTCODES = ['8093', '8049', '8053']
+/** ETH's Oerlikon postcode; Basel is every 4xxx postcode. Everything else is Zentrum. */
+export const OERLIKON_POSTCODES = ['8050']
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/
 export const isDate = (value: unknown): value is string => typeof value === 'string' && DATE.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`))
@@ -74,6 +84,10 @@ const time = (value: unknown): string => typeof value === 'string' && /^\d{2}:\d
 /** A meal time starting at three or later is dinner, whatever the outlet calls it. */
 const serviceAt = (from: string): Service => from && from >= '15:00' ? 'dinner' : 'lunch'
 const GROUPS: Record<number, PriceGroup> = { 10: 'students', 11: 'internal', 13: 'external' }
+/** Cookpit's allergen code for gluten ("gluten wheat"). */
+const ETH_GLUTEN_CODE = 10
+/** food2050's allergen ids of the gluten cereals. */
+export const UZH_GLUTEN_IDS = ['cerealsContainingGluten', 'wheat', 'barley', 'rye', 'spelt', 'oat', 'oats', 'kamut']
 
 // ── ETH (Cookpit) ────────────────────────────────────────────────────────────
 
@@ -89,7 +103,20 @@ export function parseEthFacilities(body: unknown): EthFacility[] {
   })
 }
 
-export const isHoenggerberg = (facility: EthFacility) => HOENGGERBERG_POSTCODES.includes(facility.postcode)
+export type EthZone = 'zentrum' | 'hoenggerberg' | 'oerlikon' | 'basel'
+/** ETH's own location rule by postcode: Hönggerberg, Oerlikon and Basel by their postcodes, Zentrum for the rest. */
+export function ethZone(facility: EthFacility): EthZone {
+  if (HOENGGERBERG_POSTCODES.includes(facility.postcode)) return 'hoenggerberg'
+  if (OERLIKON_POSTCODES.includes(facility.postcode)) return 'oerlikon'
+  if (/^4\d{3}$/.test(facility.postcode)) return 'basel'
+  return 'zentrum'
+}
+export const isHoenggerberg = (facility: EthFacility) => ethZone(facility) === 'hoenggerberg'
+/** The campus tag of an ETH facility: Zentrum is "ETH", Hönggerberg "Höngg"; Oerlikon and Basel have none. */
+export function ethCampus(facility: EthFacility): Campus | null {
+  const zone = ethZone(facility)
+  return zone === 'zentrum' ? 'eth' : zone === 'hoenggerberg' ? 'hoengg' : null
+}
 
 /** Cookpit pictures are served with the same client id as the menus. */
 export function ethImage(url: unknown): string {
@@ -117,6 +144,7 @@ function ethDish(line: Record<string, unknown>, fallback: Map<number, Record<str
   if (!name && !description) return null
   const codes = list(meal['meal-class-array']).map(record)
   const diet = codes.some(row => row.code === 16) ? 'vegan' : codes.some(row => row.code === 17) ? 'vegetarian' : null
+  const allergens = list(meal['allergen-array']).map(record)
   return {
     id: `eth:${id ?? name}`,
     line: text(line.name),
@@ -128,8 +156,9 @@ function ethDish(line: Record<string, unknown>, fallback: Map<number, Record<str
       const group = GROUPS[row['customer-group-code'] as number]
       return group && typeof row.price === 'number' ? [{ group, price: row.price }] : []
     }),
-    allergens: list(meal['allergen-array']).map(row => text(record(row).desc)).filter(Boolean),
+    allergens: allergens.map(row => text(row.desc)).filter(Boolean),
     climate: null,
+    gluten: allergens.length ? allergens.some(row => row.code === ETH_GLUTEN_CODE || /gluten/i.test(text(row.desc))) : null,
     image: ethImage(meal['image-url']),
     detail: ''
   }
@@ -152,7 +181,7 @@ export function ethMealsById(body: unknown): Map<number, Record<string, unknown>
 /** True when an answer left a dish name to Cookpit's "novalue" placeholder. */
 export const ethHasGaps = (body: unknown) => JSON.stringify(body ?? null).includes('"novalue"')
 
-/** The week starting `monday` for the given facilities, one entry per facility in their order. */
+/** The week starting `monday` for the given facilities (Zentrum and Hönggerberg), one entry per facility in their order. */
 export function parseEthWeek(body: unknown, facilities: EthFacility[], monday: string, fallback = new Map<number, Record<string, unknown>>()): Location[] {
   const rotas = list(record(body)['weekly-rota-array']).map(record)
   return facilities.map(facility => {
@@ -163,7 +192,10 @@ export function parseEthWeek(body: unknown, facilities: EthFacility[], monday: s
       const rota = own.find(row => text(row['valid-from']) <= date && date <= text(row['valid-to']))
       const day = rota ? list(rota['day-of-week-array']).map(record).find(row => row['day-of-week-code'] === offset + 1) : undefined
       const services: ServiceMenu[] = []
-      for (const hours of list(day?.['opening-hour-array']).map(record))
+      const opening: Hours[] = []
+      for (const hours of list(day?.['opening-hour-array']).map(record)) {
+        const from = time(hours['time-from']), to = time(hours['time-to'])
+        if (from && to) opening.push({ from, to })
         for (const mealTime of list(hours['meal-time-array']).map(record)) {
           const from = time(mealTime['time-from']), to = time(mealTime['time-to'])
           const dishes = list(mealTime['line-array']).map(record).map(line => ethDish(line, fallback)).filter((dish): dish is Dish => dish !== null)
@@ -173,9 +205,10 @@ export function parseEthWeek(body: unknown, facilities: EthFacility[], monday: s
           if (same) same.dishes.push(...dishes)
           else services.push({ service, from, to, dishes })
         }
-      days.push({ date, services })
+      }
+      days.push({ date, hours: opening, services })
     }
-    return { id: `eth:${facility.id}`, source: 'eth' as const, name: facility.name, place: facility.place, url: facility.url, days }
+    return { id: `eth:${facility.id}`, source: 'eth' as const, campus: ethCampus(facility) ?? 'eth', name: facility.name, place: facility.place, area: '', url: facility.url, days }
   })
 }
 
@@ -298,6 +331,7 @@ export function parseUzhWeek(html: string): Map<string, Dish[]> {
       if (!name) return []
       const rating = text(record(record(dish.stats).food2050climateImpact).rating)
       const climate: Climate | null = rating === 'LOW' || rating === 'MEDIUM' || rating === 'HIGH' ? rating : null
+      const allergens = list(dish.allergens).map(row => text(record(record(row).allergen).externalId)).filter(Boolean)
       return [{
         id: `uzh:${text(item.id) || text(dish.id) || name}`,
         line: text(record(item.category).name),
@@ -306,8 +340,9 @@ export function parseUzhWeek(html: string): Map<string, Dish[]> {
         diet: dish.isVegan === true ? 'vegan' as const : dish.isVegetarian === true ? 'vegetarian' as const : null,
         classes: [],
         prices: [],
-        allergens: list(dish.allergens).map(row => text(record(record(row).allergen).externalId)).filter(Boolean),
+        allergens,
         climate,
+        gluten: allergens.length ? allergens.some(id => UZH_GLUTEN_IDS.includes(id)) : null,
         image: '',
         detail: isDishUrl(text(item.detailUrl)) ? text(item.detailUrl) : ''
       }]
@@ -362,12 +397,59 @@ export function uzhLocation(outlet: Outlet, page: UzhOutletPage, weeks: { servic
       if (same) same.dishes.push(...dishes)
       else services.push({ service, from: '', to: '', dishes })
     }
-    days.push({ date, services })
+    days.push({ date, hours: [], services })
   }
-  return { id: `uzh:${outlet.path}`, source: 'uzh', name: page.name || outlet.name, place: page.place, url: uzhUrl(language, outlet.path), days }
+  return { id: `uzh:${outlet.path}`, source: 'uzh', campus: 'uzh', name: page.name || outlet.name, place: page.place, area: outlet.campus, url: uzhUrl(language, outlet.path), days }
 }
 
-/** The outlets opened by default: the mensas and the Lichthof. */
-export const openByDefault = (name: string) => /mensa|lichthof/i.test(name)
+// ── Filters and the place list ───────────────────────────────────────────────
+
+export type Filters = { vegetarian: boolean; vegan: boolean; glutenFree: boolean }
+export const NO_FILTERS: Filters = { vegetarian: false, vegan: false, glutenFree: false }
+export const hasFilters = (filters: Filters) => filters.vegetarian || filters.vegan || filters.glutenFree
+
+/**
+ * Whether a dish passes the diet filters. Vegetarian includes vegan dishes. Gluten-free needs the
+ * source to declare the dish's allergens without a gluten cereal: a dish without any declared
+ * allergens is never called gluten-free.
+ */
+export function matchesFilters(dish: Dish, filters: Filters): boolean {
+  if (filters.vegan && dish.diet !== 'vegan') return false
+  if (filters.vegetarian && !dish.diet) return false
+  if (filters.glutenFree && dish.gluten !== false) return false
+  return true
+}
+
+export const menuOf = (location: Location, date: string, service: Service) =>
+  location.days.find(day => day.date === date)?.services.find(row => row.service === service)
+
+/** The dishes a place serves for the day and meal that pass the filters. */
+export const dishesOf = (location: Location, date: string, service: Service, filters: Filters) =>
+  (menuOf(location, date, service)?.dishes ?? []).filter(dish => matchesFilters(dish, filters))
+
+/** The opening hours around a meal: the block its serving time falls in, else the day's first block. */
+export function openingOf(location: Location, date: string, service: Service): Hours | null {
+  const day = location.days.find(row => row.date === date)
+  if (!day?.hours.length) return null
+  const from = menuOf(location, date, service)?.from ?? ''
+  return day.hours.find(block => from && block.from <= from && from < block.to) ?? day.hours[0]
+}
+
+/** `open` or `closed` right now when `date` is today; `null` for another day. */
+export function openState(hours: Hours, date: string, now = new Date()): 'open' | 'closed' | null {
+  if (date !== today(now)) return null
+  const clock = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
+  return hours.from <= clock && clock < hours.to ? 'open' : 'closed'
+}
+
+/** `place:<location id>`, the page instance of one place. */
+export const placeInstance = (id: string) => `place:${id}`
+export function placeOf(instanceId: string | undefined): { source: Source; key: string; id: string } | null {
+  const match = /^place:(eth|uzh):(.+)$/.exec(instanceId ?? '')
+  if (!match) return null
+  const source = match[1] as Source, key = match[2]
+  if (source === 'eth' ? !/^\d+$/.test(key) : !isOutletPath(key)) return null
+  return { source, key, id: `${source}:${key}` }
+}
 
 export function formatPrice(price: number): string { return `CHF ${price.toFixed(2)}` }

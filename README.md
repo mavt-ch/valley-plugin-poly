@@ -1,27 +1,29 @@
 # Study
 
-Study tools for ETH and UZH students in Valley. Version 1.0.0 has one feature: a **Menu plan**.
+Study tools for ETH and UZH students in Valley. Version 1.1.0 has one feature: a **Menu plan**.
 
 ## Menu plan
 
-Two surfaces show the same day and meal:
+- **Left sidebar** (the fork-and-knife entry in the Icon Rail), three rows:
+  1. *Menu plan* with Lunch | Dinner and the page button (corners icon).
+  2. The campus tags **ETH** (ETH Zentrum), **Höngg** (ETH Hönggerberg) and **UZH** (the UZH outlets), each with the number of places that have a matching menu. A tag shows only while its campus has a place serving the meal that day.
+  3. The day: arrows move a day, a click on the date comes back to today; the funnel opens the filters.
 
-- **Left sidebar**: the fork-and-knife entry in the Icon Rail opens a compact list of outlets and dishes.
-- **Page**: the page button in the sidebar header (or Open the menu plan page on an outlet's right-click menu) opens a main-workspace page with every dish as a card: its picture, line, price, description, diet and climate tags; a click shows all prices and the allergens. In a narrow pane the cards become rows with the picture on the left.
+  Below, one row per place: its name, how many menus it has for the day and meal (after the filters), its location (building and floor for ETH, campus and street for UZH) and, where the source publishes opening hours (ETH), *Open now* or *Closed* with the hours. A click opens the place's page, ⌘-click or the middle button opens it in a new tab; right-click offers a new tab, the place's website and Refresh.
+- **Page**: a place's page shows its name, location, opening and serving hours and every menu as a card with its picture, line, price, description, diet and climate tags; a click on a card shows all prices and the allergens. The page button in the sidebar opens the chosen campus with every place and its cards. In a narrow pane the cards become rows with the picture on the left. The page shares the day, meal, filters and price with the sidebar.
+- **Filters** (the funnel in the sidebar and on the page, also Settings → Study): Vegetarian (vegan included), Vegan, Gluten-free, and the price shown (Students, Staff, Guests). A menu counts as gluten-free only when its source declares its allergens and none is a gluten cereal (ETH "gluten wheat", UZH gluten-containing cereals, wheat, barley, rye, spelt, oats, kamut); a menu without declared allergens is never called gluten-free.
 
-The sources:
+The campuses:
 
-- **ETH Hönggerberg**: every ETH outlet on the Hönggerberg campus (postcodes 8093, 8049 and 8053, the rule ETH's own gastronomy page uses), with opening times of the meal, prices for students, staff or guests (Settings → Study → Prices for), diet, menu type and allergens.
-- **UZH**: every UZH outlet the ZFV publishes on food2050, grouped by campus. The mensas and the Lichthof are open by default; any other outlet is read only once you open it. Dishes carry diet, food2050's climate rating and allergens; on the page each card also reads its dish page for the picture and the prices.
-
-Use the arrows to move a day, click the date to come back to today, switch Lunch and Dinner, fold or open an outlet (remembered), click a dish for all prices and its allergens, right-click an outlet to open its website. The refresh button reads the services again past the half-hour cache.
+- **ETH** and **Höngg**: ETH's outlets sorted by postcode as ETH's own gastronomy page does: Hönggerberg 8093, 8049 and 8053; Oerlikon (8050) and Basel are not shown; everything else is Zentrum. Opening hours, serving times, prices for students, staff and guests, diet, menu type and allergens.
+- **UZH**: every UZH outlet the ZFV publishes on food2050, read in the background when the menu plan opens (two pages at a time, kept for 30 minutes) so the list and the tag counts are complete. Dishes carry diet, food2050's climate rating and allergens; on the page each card also reads its dish page for the picture and the prices. food2050 publishes no opening hours.
 
 ## Data sources
 
 - ETH: the Cookpit service behind ETH's gastronomy page, `https://idapps.ethz.ch/cookpit-pub-services/v1/` (`facilities`, `weeklyrotas`), with the client id that page sends. Missing English texts (`novalue`) are filled from the German answer.
-- UZH: the food2050 pages of the ZFV, `https://app.food2050.ch/{de|en}/zfv/universitat-zurich…`. They have no public API; the plugin reads the structured payload each server-rendered page embeds (organisation page → outlets, outlet page → meal categories, `…/<category>/menu/weekly?week=&year=` → dishes, a dish's own page → picture and prices). Pictures come from `storage.googleapis.com/dish-images-prod/`.
+- UZH: the food2050 pages of the ZFV, `https://app.food2050.ch/{de|en}/zfv/universitat-zurich…`. They have no public API; the plugin reads the structured payload each server-rendered page embeds (organisation page → outlets, outlet page → address and meal categories, `…/<category>/menu/weekly?week=&year=` → dishes, a dish's own page → picture and prices). Pictures come from `storage.googleapis.com/dish-images-prod/`.
 
-Network requests run only in the backend, two at a time, to `idapps.ethz.ch`, `app.food2050.ch` and `storage.googleapis.com` (the only declared hosts). Pictures reach the page as data addresses, read only once a card is on screen.
+Network requests run only in the backend, two at a time, to `idapps.ethz.ch`, `app.food2050.ch` and `storage.googleapis.com` (the only declared hosts); the open page's reads and pictures go before the list's background reads. Pictures reach the page as data addresses, read only once a card is on screen.
 
 ## Build and test
 
