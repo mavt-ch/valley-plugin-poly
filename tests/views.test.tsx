@@ -223,7 +223,10 @@ describe('menu plan page', () => {
     expect(head.textContent).toBe('Test Hall')
     expect(head.querySelectorAll('button')).toHaveLength(1)
     expect(screen.getAllByRole('heading')).toHaveLength(1)
-    expect(container.querySelector('.study-place-facts')!.textContent).toBe('HXX E 1Open now · 11:00–20:00Lunch 11:00–13:302 menus')
+    const facts = container.querySelector('.study-page > .study-bar.study-facts')!
+    expect(facts.textContent).toBe('HXX E 1Open now · 11:00–20:00Lunch 11:00–13:302 menus')
+    expect(facts.closest('.study-list')).toBeNull()
+    expect(container.querySelectorAll('.study-page > .study-bar')).toHaveLength(2)
     expect(screen.queryByText(/November 25/)).toBeNull()
     const picture = screen.getByAltText('Lentil curry') as HTMLImageElement
     expect(picture.src).toBe(`data:image/jpeg;base64,${btoa('https://idapps.ethz.ch/cookpit-pub-services/v1/images/5001?client-id=ethz-wcms')}`)

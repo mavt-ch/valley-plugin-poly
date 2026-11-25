@@ -66,11 +66,14 @@ export const VIEWS_CSS = `
 .study-place-meta { grid-column: 1 / -1; min-width: 0; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .study-open { color: var(--tint-green-text, var(--text-secondary)); }
 .study-closed { color: var(--text-secondary); }
-.study-place-head { display: grid; gap: 4px; padding: 0 2px 14px; }
 /* The page's first bar names the place (or the campus) only; day, meal and filters live in the sidebar. */
 .study-page-title { flex: 1; min-width: 0; margin: 0; color: var(--title-color); font-size: var(--normal-font-size, 1rem); font-weight: 600; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .study-page-head .study-bar-balance { width: var(--shell-control-toolbar, 24px); flex-shrink: 0; }
-.study-place-facts { display: flex; flex-wrap: wrap; gap: 4px 14px; color: var(--text-secondary); font-size: var(--small-font-size); }
+/* A place's facts: a fixed, centred second bar (37px + 1px line) that never scrolls or wraps; the location gives way first. */
+.study-page .study-bar.study-facts { padding: 0; overflow: hidden; }
+.study-facts-inner { display: flex; align-items: center; justify-content: center; gap: 14px; width: 100%; padding: 0 24px; box-sizing: border-box; overflow: hidden; white-space: nowrap; color: var(--text-secondary); font-size: var(--small-font-size); }
+.study-facts-inner > span { flex-shrink: 0; }
+.study-facts-inner > .study-facts-where { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .study-section + .study-section { margin-top: 22px; }
 .study-place-link { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 4px 2px 8px; border: 0; border-radius: var(--radius-sm, 4px); background: transparent; color: var(--title-color); font: inherit; text-align: left; cursor: pointer; }
 .study-place-link:hover .study-place-link-name { text-decoration: underline; }
@@ -99,6 +102,7 @@ export const VIEWS_CSS = `
 /* A narrow page lays each card out as a row: picture left, text right. */
 @container (max-width: 560px) {
   .study-page-inner { padding: 10px 12px 28px; }
+  .study-facts-inner { padding: 0 12px; }
   .study-cards { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .study-card { flex-direction: row; align-items: stretch; }
   .study-card-image { flex: 0 0 112px; aspect-ratio: auto; min-height: 112px; }
@@ -443,14 +447,17 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
   function PlaceFacts({ location, preferences }: { location: Location; preferences: Preferences }): Node {
     const menu = menuOf(location, preferences.date, preferences.service)
     const count = dishesOf(location, preferences.date, preferences.service, preferences.filters).length
-    return h('div', { className: 'study-place-facts' },
-      where(location) ? h('span', null, where(location)) : null,
+    return h('div', { className: 'study-facts-inner' },
+      where(location) ? h('span', { className: 'study-facts-where', title: where(location) }, where(location)) : null,
       h(OpeningLabel, { location, date: preferences.date, service: preferences.service }),
       menu?.from && menu.to ? h('span', null, fill(t(`service.time.${preferences.service}`), { hours: `${menu.from}–${menu.to}` })) : null,
       menu ? h('span', null, menusLabel(count)) : null)
   }
 
-  /** One place's page: its location, hours and its menus as cards; its name stands in the page's first bar. */
+  /** The page's scrolling body below its fixed bars. */
+  const scroll = (...children: (Node | null)[]): Node => h('div', { className: 'study-list' }, h('div', { className: 'study-page-inner' }, ...children))
+
+  /** One place's page: a fixed bar with its location and hours, then its menus as cards; its name stands in the page's first bar. */
   function PlaceBody({ place, preferences, revision, onTitle }: { place: NonNullable<ReturnType<typeof placeOf>>; preferences: Preferences; revision: number; onTitle: (title: string) => void }): Node {
     const monday = mondayOf(preferences.date)
     const eth = useEthWeek(preferences, revision, place.source === 'eth')
@@ -459,12 +466,12 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     const state = place.source === 'eth' ? eth : uzh
     const location = place.source === 'eth' ? eth.data?.find(row => row.id === place.id) ?? null : uzh.data
     React.useEffect(() => { if (location) onTitle(location.name) }, [location?.name])
-    if (state.error) return h('div', { className: 'study-note error', role: 'alert' }, state.error)
-    if (!location) return h('div', { className: 'study-note' }, state.loading ? t('loading') : t('error.notFound'))
-    return h(React.Fragment, null,
-      h('div', { className: 'study-place-head' }, h(PlaceFacts, { location, preferences })),
+    const facts = h('div', { className: 'study-bar study-facts' }, location ? h(PlaceFacts, { location, preferences }) : null)
+    if (state.error) return h(React.Fragment, null, facts, scroll(h('div', { className: 'study-note error', role: 'alert' }, state.error)))
+    if (!location) return h(React.Fragment, null, facts, scroll(h('div', { className: 'study-note' }, state.loading ? t('loading') : t('error.notFound'))))
+    return h(React.Fragment, null, facts, scroll(
       h(Cards, { location, preferences, revision }),
-      h('div', { className: 'study-credit' }, t(location.source === 'uzh' ? 'credit.uzh' : 'credit.eth')))
+      h('div', { className: 'study-credit' }, t(location.source === 'uzh' ? 'credit.uzh' : 'credit.eth'))))
   }
 
   /** Without a place: every place of the chosen campus, each heading opening its own page. */
@@ -473,10 +480,10 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     const { active } = campusTags(places, preferences.campus)
     const heading = t(`campus.${active}.title`)
     React.useEffect(() => { onTitle(heading) }, [heading])
-    if (places.error[active]) return h('div', { className: 'study-note error', role: 'alert' }, places.error[active])
+    if (places.error[active]) return scroll(h('div', { className: 'study-note error', role: 'alert' }, places.error[active]))
     const listed = places.byCampus[active].filter(location => places.count(location) > 0)
-    return h(React.Fragment, null,
-      listed.map(location => h('section', { key: location.id, className: 'study-section', 'data-place': location.id },
+    return scroll(
+      ...listed.map(location => h('section', { key: location.id, className: 'study-section', 'data-place': location.id },
         h('button', {
           type: 'button', className: 'study-place-link',
           onClick: (event: MouseEvent) => openPlace(location, api.ui.hasModKey(event)),
@@ -500,8 +507,7 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
         h('span', { className: 'study-bar-balance', 'aria-hidden': true }),
         h('h1', { className: 'study-page-title' }, title),
         h('button', { type: 'button', className: `study-icon-btn${refreshing ? ' spinning' : ''}`, title: t('refresh'), 'aria-label': t('refresh'), onClick: refresh }, h(Icon, { shapes: REFRESH }))),
-      h('div', { className: 'study-list' }, h('div', { className: 'study-page-inner' },
-        place ? h(PlaceBody, { place, preferences, revision, onTitle: setTitle }) : h(OverviewBody, { preferences, revision, refresh, onTitle: setTitle }))))
+      place ? h(PlaceBody, { place, preferences, revision, onTitle: setTitle }) : h(OverviewBody, { preferences, revision, refresh, onTitle: setTitle }))
   }
 
   api.registerView('study.panel', Panel)
