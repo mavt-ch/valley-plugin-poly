@@ -1,4 +1,5 @@
 import type { PluginBackendApi } from '@valley/plugin-sdk'
+import { textFromBase64 } from '../base64'
 import {
   ETH_BASE, ETH_CLIENT, UZH_ORGANISATION, ethCampus, ethHasGaps, ethMealsById, isDate, isOutletPath, parseEthFacilities, parseEthWeek,
   isDishUrl, isImageUrl, parseUzhAllergenNames, parseUzhDish, parseUzhOutlet, parseUzhOutlets, parseUzhWeek, isoWeek, addDays, uzhLocation, uzhUrl, weekday,
@@ -17,11 +18,6 @@ const MAX_PARALLEL = 2
 /** The host refuses a request that asks for more than 4 MiB. */
 export const MAX_RESPONSE_BYTES = 4 * 1024 * 1024
 const LANGUAGES = new Set(['de', 'en'])
-
-/** UTF-8 text from a base64 body. */
-export function decode(base64: string): string {
-  return new TextDecoder().decode(Uint8Array.from(atob(base64), character => character.charCodeAt(0)))
-}
 
 function input(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('invalidInput')
@@ -60,7 +56,7 @@ export function register(api: PluginBackendApi): () => Promise<void> {
       throw new Error('networkError')
     } finally { requests.delete(requestId); release() }
   }
-  const get = async (url: string, accept: string, background = false): Promise<string> => decode((await fetchRaw(url, accept, background)).bodyBase64)
+  const get = async (url: string, accept: string, background = false): Promise<string> => textFromBase64((await fetchRaw(url, accept, background)).bodyBase64)
   const json = async (url: string): Promise<unknown> => {
     const body = await get(url, 'application/json')
     try { return JSON.parse(body) } catch { throw new Error('formatError') }

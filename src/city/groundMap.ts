@@ -8,7 +8,6 @@ import { wgs84ToLv95 } from './geo'
  * Tiles are chosen around the camera target at one zoom level picked from the camera distance; the scene
  * renders on demand, so a loaded tile only asks for one more frame.
  */
-export const MAX_GROUND_ZOOM = 16
 /** Every ground surface leaves out the pixels a shown floor has marked, so floors below the ground stay visible. */
 export const GROUND_STENCIL = { stencilWrite: true, stencilRef: 1, stencilFunc: NotEqualStencilFunc }
 const GRID = 8

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { BUILDINGS, addressOf, buildingOf, fold, groupBuildings, searchBuildings } from '../src/campus/data'
-import { boundsOf, exceeded, floorElevations, insidePolygon, parseLevels, parseOutlines, parseRoomQuery, parseRooms, roomBuilding, roomKind, roomLabel, roomWhere } from '../src/campus/services'
+import { boundsOf, exceeded, floorElevations, insidePolygon, parseLevels, parseOutlines, parseRoomQuery, parseRooms, roomKind, roomLabel, roomWhere } from '../src/campus/services'
 import { LEVELS, OUTLINES, ROOMS } from './campus-fixtures'
 
 describe('building list', () => {
@@ -72,7 +72,6 @@ describe('campus services', () => {
     expect(roomWhere({ building: "HG'", floor: 'F', number: '7' })).toBeNull()
     expect(roomWhere({ building: 'HG', floor: 'F', number: "7' OR '1'='1" })).toBeNull()
     expect(roomWhere({ building: 'HG', words: ["X' OR 1=1"] })).toBeNull()
-    expect(roomBuilding(parseRooms(ROOMS)[0])).toBe('HG')
     expect(roomLabel('HG F 7', 'HG')).toBe('F 7')
     expect(roomLabel('HCI E 8', 'HG')).toBe('HCI E 8')
   })

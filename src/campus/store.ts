@@ -94,8 +94,6 @@ export function loadRooms(level: string): void {
     error => { failed(error); updateCampus({ roomsStatus: new Map(state.roomsStatus).set(level, 'error') }) })
 }
 
-export const outlineOf = (code: string | undefined): Outline | null => (code && state.outlines?.find(outline => outline.code === code)) || null
-
 /** Poly's campus page: instance `campus` or `campus-<id>`; 2.0.0's `city` / `city-<id>` tabs open it too. */
 export const isCampusInstance = (instanceId: string | undefined): boolean =>
   instanceId === 'campus' || instanceId === 'city' || Boolean(instanceId?.startsWith('campus-') || instanceId?.startsWith('city-'))

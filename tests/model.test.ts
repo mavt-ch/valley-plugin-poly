@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addDays, defaultService, dishesOf, priceFor, pricesInOrder, ethCampus, ethZone, matchesFilters, menuOf, openState, openingOf, placeInstance, placeOf, NO_FILTERS, ethHasGaps, ethMealsById, flightPayload, isHoenggerberg, isoWeek, mondayOf, outletPath, parseEthFacilities, parseEthWeek,
+  addDays, defaultService, dishesOf, priceFor, pricesInOrder, ethCampus, ethZone, matchesFilters, menuOf, openState, openingOf, placeInstance, placeOf, NO_FILTERS, ethHasGaps, ethMealsById, flightPayload, isoWeek, mondayOf, outletPath, parseEthFacilities, parseEthWeek,
   ethImage, isDishUrl, isImageUrl, parseUzhDish, priceGroupOf, parseUzhAllergenNames, parseUzhOutlet, parseUzhOutlets, parseUzhWeek, payloadProps, sourceLanguage, uzhLocation, weekday
 } from '../src/model'
 import { DISH_IMAGE, ETH_FACILITIES, ETH_ROTAS, ETH_ROTAS_DE, UZH_DINNER, UZH_DISH, UZH_LUNCH, UZH_ORG, UZH_OUTLET } from './fixtures'
@@ -25,7 +25,7 @@ describe('dates', () => {
 
 describe('ETH Cookpit', () => {
   const all = parseEthFacilities(ETH_FACILITIES)
-  const facilities = all.filter(isHoenggerberg)
+  const facilities = all.filter(facility => ethZone(facility) === 'hoenggerberg')
   it('sorts the facilities into ETH’s zones by postcode and tags Zentrum and Hönggerberg', () => {
     expect(facilities.map(row => row.name)).toEqual(['Test Hall', 'Ring Bistro'])
     expect(facilities[0].place).toBe('HXX E 1')

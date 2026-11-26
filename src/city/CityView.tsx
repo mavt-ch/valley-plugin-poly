@@ -10,11 +10,6 @@ export function clearSelection(): void {
   activeScene?.clearSelection()
 }
 
-/** Back to the default view over the city. */
-export function resetCityView(): void {
-  activeScene?.resetView()
-}
-
 export function zoomCity(step: number): void {
   activeScene?.zoomBy(step)
 }

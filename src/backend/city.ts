@@ -1,4 +1,5 @@
 import type { PluginBackendApi } from '@valley/plugin-sdk'
+import { bytesFromBase64 } from '../base64'
 
 /**
  * A model installed into the realm's plugin data (`npm run update-model -- --realm`). The packaged model is not read
@@ -23,11 +24,7 @@ interface ByteStorage {
 }
 
 function toBuffer(chunk: { bytes?: ArrayBuffer; base64?: string }): ArrayBuffer {
-  if (chunk.bytes) return chunk.bytes
-  const binary = atob(chunk.base64 ?? '')
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-  return bytes.buffer
+  return chunk.bytes ?? bytesFromBase64(chunk.base64 ?? '').buffer
 }
 
 export function registerCity(api: PluginBackendApi): () => void {

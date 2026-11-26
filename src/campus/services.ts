@@ -202,8 +202,5 @@ export function roomWhere(query: RoomQuery): string | null {
   return `NAME LIKE '${query.building} %' AND ${types}`
 }
 
-/** "HG F 7" → building "HG", floor "F" (from the room's floor id). */
-export const roomBuilding = (room: Pick<Room, 'level'>): string => room.level.split('.')[1] ?? ''
-
 /** A room's label on the map: its number without the building code ("HG F 7" → "F 7"). */
 export const roomLabel = (name: string, code: string): string => name.startsWith(`${code} `) ? name.slice(code.length + 1) : name

@@ -1,4 +1,5 @@
 import type { PluginBackendApi } from '@valley/plugin-sdk'
+import { textFromBase64 } from '../base64'
 import { ELINK_BOARDS, ELINK_MAX_PAGES, ELINK_PAGE, elinkDay, isElinkDate, pageEnd, stationboardUrl, type ElinkDay } from '../elink/model'
 
 /** Today's boards carry live delays and are read again after two minutes; other days keep 30 minutes, like the menus. */
@@ -8,9 +9,6 @@ const MAX_PARALLEL = 2
 /** The host refuses a request that asks for more than 4 MiB; a page of 420 buses with the asked fields is about 0.8 MB. */
 const MAX_BYTES = 4 * 1024 * 1024
 
-function decode(base64: string): string {
-  return new TextDecoder().decode(Uint8Array.from(atob(base64), character => character.charCodeAt(0)))
-}
 const localToday = (now = new Date()) => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 
 /**
@@ -34,7 +32,7 @@ export function registerElink(api: PluginBackendApi): () => Promise<void> {
       const result = await api.network.fetch({ url, method: 'GET', headers: { Accept: 'application/json' }, requestId, timeoutMs: 20_000, maxResponseBytes: MAX_BYTES })
       if (disposed) throw new Error('unavailable')
       if (result.status < 200 || result.status >= 300) throw new Error('serviceError')
-      try { return JSON.parse(decode(result.bodyBase64)) } catch { throw new Error('formatError') }
+      try { return JSON.parse(textFromBase64(result.bodyBase64)) } catch { throw new Error('formatError') }
     } catch (error) {
       if (error instanceof Error && ['unavailable', 'serviceError', 'formatError'].includes(error.message)) throw error
       console.warn(`[poly] transport.opendata.ch: ${error instanceof Error ? error.message : String(error)}`)

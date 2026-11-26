@@ -60,10 +60,11 @@ function decodeV2(bytes: Uint8Array, vertexCount: number, indexCount: number, in
   let at = HEADER_BYTES
   for (let axis = 0; axis < 3; axis++) {
     let value = 0
-    for (let k = 0; k < vertexCount; k++) {
-      const zigzag = bytes[at + k] | (bytes[at + vertexCount + k] << 8)
-      value += (zigzag >>> 1) ^ -(zigzag & 1)
-      positions[k * 3 + axis] = value
+    const high = at + vertexCount
+    for (let k = 0, out = axis; k < vertexCount; k++, out += 3) {
+      const zigzag = bytes[at + k] | (bytes[high + k] << 8)
+      value = (value + ((zigzag >>> 1) ^ -(zigzag & 1))) & 0xffff
+      positions[out] = value
     }
     at += vertexCount * 2
   }
@@ -73,12 +74,13 @@ function decodeV2(bytes: Uint8Array, vertexCount: number, indexCount: number, in
   const indices = indexBytes === 4 ? new Uint32Array(indexCount) : new Uint16Array(indexCount)
   let newest = 0
   for (let i = 0; i < indexCount; i++) {
-    let code = 0
-    for (let shift = 0; ; shift += 7) {
+    if (at >= end) throw new Error('Truncated Zürich 3D tile')
+    let byte = bytes[at++]
+    let code = byte & 127
+    for (let scale = 128; byte >= 128; scale *= 128) {
       if (at >= end) throw new Error('Truncated Zürich 3D tile')
-      const byte = bytes[at++]
-      code += (byte & 127) * 2 ** shift
-      if (byte < 128) break
+      byte = bytes[at++]
+      code += (byte & 127) * scale
     }
     const vertex = newest - code
     if (vertex < 0 || vertex >= vertexCount) throw new Error('Invalid Zürich 3D tile')

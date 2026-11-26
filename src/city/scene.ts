@@ -1,8 +1,8 @@
-import { BufferAttribute, BufferGeometry, CanvasTexture, Color, DirectionalLight, DoubleSide, Fog, HemisphereLight, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, MeshLambertMaterial, PerspectiveCamera, Raycaster, RepeatWrapping, ReplaceStencilOp, Scene, ShapeUtils, Sprite, SpriteMaterial, Vector2, Vector3, WebGLRenderer } from 'three'
+import { BufferAttribute, BufferGeometry, CanvasTexture, Color, DirectionalLight, DoubleSide, Fog, HemisphereLight, InterleavedBuffer, InterleavedBufferAttribute, LineBasicMaterial, LineSegments, Matrix4, Mesh, MeshBasicMaterial, MeshLambertMaterial, PerspectiveCamera, Quaternion, Raycaster, RepeatWrapping, ReplaceStencilOp, Scene, ShapeUtils, Sprite, SpriteMaterial, Vector2, Vector3, WebGLRenderer } from 'three'
 import { MapControls } from 'three/addons/controls/MapControls.js'
 import { GROUND_STENCIL, GroundMap } from './groundMap'
 import { boundsOfLv95, boundsOverlap, buildingsInArea, type Lv95Polygon } from './match'
-import { buildingAtTriangle, decodeTile, gunzip, type TileBuilding, type TileEntry, type TileIndex } from './tileFormat'
+import { buildingAtTriangle, decodeTile, gunzip, type DecodedTile, type TileBuilding, type TileEntry, type TileIndex } from './tileFormat'
 import type { ColorMode, SelectedBuilding } from './store'
 
 export interface CameraState { position: [number, number, number]; target: [number, number, number] }
@@ -34,18 +34,53 @@ export interface SceneEvents {
 
 interface Palette { background: Color; wall: Color; roof: Color; footprint: Color; ground: Color; accent: Color; ramp: Color[] }
 
+/**
+ * A loaded tile keeps the decoder's 16-bit positions, padded to four per vertex, and RGBA colours: 8 + 4 bytes per
+ * vertex instead of 12 + 3, and both strides are multiples of 4, which Metal needs (ANGLE copies other strides).
+ * `matrix` places the positions in the scene and `origin`/`step` turn them back into LV95.
+ */
 interface LoadedTile {
   entry: TileEntry
   mesh: Mesh
   buildings: TileBuilding[]
   kinds: Uint8Array
-  heights: Float32Array
+  matrix: Matrix4
+  origin: [number, number]
+  step: [number, number]
 }
 
 const MAX_TILES = 220
 const CONCURRENCY = 6
 const BASE_HEIGHT = 400
 const DEFAULT_VIEW = { east: 2683250, north: 1247900, distance: 1600 }
+/** LV95 (east, north, height) to the scene's (x, up, −north). */
+const LV95_TO_SCENE = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), -Math.PI / 2)
+
+/**
+ * A decoded tile as geometry plus the matrix that places it in a scene centred on `sceneOrigin` (LV95): the
+ * quantized positions stay 16-bit (padded to four per vertex) and the matrix applies origin, step and the axis swap.
+ */
+export function tileGeometry(tile: DecodedTile, sceneOrigin: [number, number]): { geometry: BufferGeometry; matrix: Matrix4 } {
+  const [ox, oy, oz] = tile.origin
+  const [sx, sy, sz] = tile.step
+  const matrix = new Matrix4().compose(new Vector3(ox - sceneOrigin[0], oz - BASE_HEIGHT, sceneOrigin[1] - oy), LV95_TO_SCENE, new Vector3(sx, sy, sz))
+  const padded = new Uint16Array(tile.vertexCount * 4)
+  for (let i = 0, j = 0; i < padded.length; i += 4, j += 3) { padded[i] = tile.positions[j]; padded[i + 1] = tile.positions[j + 1]; padded[i + 2] = tile.positions[j + 2] }
+  const geometry = new BufferGeometry()
+  geometry.setAttribute('position', new InterleavedBufferAttribute(new InterleavedBuffer(padded, 4), 3, 0))
+  geometry.setAttribute('color', new BufferAttribute(new Uint8Array(tile.vertexCount * 4).fill(255), 4, true))
+  geometry.setIndex(new BufferAttribute(tile.indices, 1))
+  geometry.computeBoundingSphere()
+  return { geometry, matrix }
+}
+
+/** A mesh fixed at `matrix`; it hangs directly under the scene, so that is also its world matrix. */
+function fix(mesh: Mesh, matrix: Matrix4): Mesh {
+  mesh.matrixAutoUpdate = false
+  mesh.matrix.copy(matrix)
+  mesh.matrixWorld.copy(matrix)
+  return mesh
+}
 
 export function parseCssColor(value: string, fallback: string): Color {
   const text = value.trim()
@@ -179,10 +214,6 @@ export class CityScene {
     this.place(east, north, distance, true)
   }
 
-  resetView(): void {
-    this.place(DEFAULT_VIEW.east, DEFAULT_VIEW.north, DEFAULT_VIEW.distance, true)
-  }
-
   /** One zoom step towards (+1) or away from (−1) the point looked at, animated like a fly-to. */
   zoomBy(step: number): void {
     const target = this.controls.target.clone()
@@ -227,10 +258,11 @@ export class CityScene {
     const index = source.getIndex()
     if (!index || !this.tileReaches(tile.entry, this.area.polygons)) return false
     const array = index.array as Uint16Array | Uint32Array
-    const positions = source.getAttribute('position').array
-    const [east, north] = this.origin
+    const position = source.getAttribute('position')
+    const [east, north] = tile.origin
+    const [stepX, stepY] = tile.step
     const buildings = buildingsInArea(tile.buildings, {
-      indices: array, kinds: tile.kinds, point: vertex => [positions[vertex * 3] + east, north - positions[vertex * 3 + 2]],
+      indices: array, kinds: tile.kinds, point: vertex => [east + position.getX(vertex) * stepX, north + position.getY(vertex) * stepY],
     }, this.area.polygons)
     if (!buildings.length) return false
     const ranges = buildings.map(building => [building[1] * 3, building[2] * 3] as const).sort((a, b) => a[0] - b[0])
@@ -241,8 +273,7 @@ export class CityScene {
     geometry.setAttribute('position', source.getAttribute('position'))
     geometry.setIndex(new BufferAttribute(picked, 1))
     const floor = Boolean(this.area.floor)
-    const mesh = new Mesh(geometry, floor ? this.ghostMaterial : this.highlightMaterial)
-    mesh.matrixAutoUpdate = false
+    const mesh = fix(new Mesh(geometry, floor ? this.ghostMaterial : this.highlightMaterial), tile.matrix)
     mesh.renderOrder = floor ? 2 : 0
     mesh.userData.buildings = buildings
     this.areaMeshes.set(tile.entry.key, mesh)
@@ -580,29 +611,9 @@ export class CityScene {
       const tile = decodeTile(await gunzip(packed))
       const buildings = JSON.parse(new TextDecoder().decode(meta)) as TileBuilding[]
       if (this.disposed || this.index !== index) return
-      const positions = new Float32Array(tile.vertexCount * 3)
-      const [ox, oy, oz] = tile.origin
-      const [sx, sy, sz] = tile.step
-      const dx = ox - this.origin[0], dy = oz - BASE_HEIGHT, dz = this.origin[1] - oy
-      for (let i = 0, j = 0; i < tile.vertexCount; i++, j += 3) {
-        positions[j] = dx + tile.positions[j] * sx
-        positions[j + 1] = dy + tile.positions[j + 2] * sz
-        positions[j + 2] = dz - tile.positions[j + 1] * sy
-      }
-      const heights = new Float32Array(tile.vertexCount)
-      for (const building of buildings) {
-        const height = building[8] - building[5]
-        const end = (building[1] + building[2]) * 3
-        for (let i = building[1] * 3; i < end; i++) heights[tile.indices[i]] = height
-      }
-      const geometry = new BufferGeometry()
-      geometry.setAttribute('position', new BufferAttribute(positions, 3))
-      geometry.setAttribute('color', new BufferAttribute(new Uint8Array(tile.vertexCount * 3), 3, true))
-      geometry.setIndex(new BufferAttribute(tile.indices, 1))
-      geometry.computeBoundingSphere()
-      const mesh = new Mesh(geometry, this.material)
-      mesh.matrixAutoUpdate = false
-      const loaded: LoadedTile = { entry, mesh, buildings, kinds: tile.kinds, heights }
+      const { geometry, matrix } = tileGeometry(tile, this.origin)
+      const mesh = fix(new Mesh(geometry, this.material), matrix)
+      const loaded: LoadedTile = { entry, mesh, buildings, kinds: tile.kinds, matrix, origin: [tile.origin[0], tile.origin[1]], step: [tile.step[0], tile.step[1]] }
       this.paint(loaded)
       this.tiles.set(entry.key, loaded)
       this.scene.add(mesh)
@@ -641,16 +652,31 @@ export class CityScene {
   private paint(tile: LoadedTile): void {
     const attribute = tile.mesh.geometry.getAttribute('color') as BufferAttribute
     const colors = attribute.array as Uint8Array
+    const { kinds } = tile
     const palette = this.palette
-    const pick = new Color()
-    for (let i = 0; i < tile.kinds.length; i++) {
-      const kind = tile.kinds[i]
-      let color: Color
-      if (this.colorMode === 'height' && kind !== 2) color = this.ramp(tile.heights[i], kind === 1, pick)
-      else color = kind === 1 ? palette.roof : kind === 2 ? palette.footprint : palette.wall
-      colors[i * 3] = color.r * 255
-      colors[i * 3 + 1] = color.g * 255
-      colors[i * 3 + 2] = color.b * 255
+    const byHeight = this.colorMode === 'height'
+    const set = (vertex: number, color: Color) => {
+      colors[vertex * 4] = color.r * 255
+      colors[vertex * 4 + 1] = color.g * 255
+      colors[vertex * 4 + 2] = color.b * 255
+    }
+    const wall = byHeight ? this.ramp(0, false, new Color()) : palette.wall
+    const roof = byHeight ? this.ramp(0, true, new Color()) : palette.roof
+    for (let i = 0; i < kinds.length; i++) set(i, kinds[i] === 1 ? roof : kinds[i] === 2 ? palette.footprint : wall)
+    // By height: a building's vertices belong to it alone, so each takes the ramp colour of its building's height.
+    if (byHeight) {
+      const indices = (tile.mesh.geometry.getIndex()!.array) as Uint16Array | Uint32Array
+      const buildingWall = new Color(), buildingRoof = new Color()
+      for (const building of tile.buildings) {
+        const height = building[8] - building[5]
+        this.ramp(height, false, buildingWall)
+        this.ramp(height, true, buildingRoof)
+        const end = (building[1] + building[2]) * 3
+        for (let i = building[1] * 3; i < end; i++) {
+          const vertex = indices[i], kind = kinds[vertex]
+          if (kind !== 2) set(vertex, kind === 1 ? buildingRoof : buildingWall)
+        }
+      }
     }
     attribute.needsUpdate = true
   }
@@ -726,8 +752,7 @@ export class CityScene {
     const geometry = new BufferGeometry()
     geometry.setAttribute('position', source.getAttribute('position'))
     geometry.setIndex(new BufferAttribute((index.array as Uint16Array | Uint32Array).slice(building[1] * 3, (building[1] + building[2]) * 3), 1))
-    const mesh = new Mesh(geometry, this.highlightMaterial)
-    mesh.matrixAutoUpdate = false
+    const mesh = fix(new Mesh(geometry, this.highlightMaterial), tile.matrix)
     this.highlight = { mesh, key: tile.entry.key, building }
     this.syncHighlight()
     this.scene.add(mesh)

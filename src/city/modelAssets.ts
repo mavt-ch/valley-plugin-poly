@@ -1,4 +1,5 @@
 import { api } from './runtime'
+import { bytesFromBase64 } from '../base64'
 
 /**
  * The packaged city model (26 Nov): `runtime/assets/model/<file>.js`, one classic script per model file, written by
@@ -10,15 +11,6 @@ const MODEL_FILE = /^(?:index\.json|ground\.bin|tiles\/-?\d{1,6}_-?\d{1,6}\.(?:b
 
 /** The package has no such model file (a package built without its model). */
 export class ModelAssetMissing extends Error {}
-
-export function decodeBase64(text: string): ArrayBuffer {
-  const fromBase64 = (Uint8Array as unknown as { fromBase64?: (value: string) => Uint8Array }).fromBase64
-  if (fromBase64) return fromBase64(text).buffer as ArrayBuffer
-  const binary = atob(text)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-  return bytes.buffer
-}
 
 const received = new Map<string, (data: string) => void>()
 const loads = new Map<string, Promise<ArrayBuffer>>()
@@ -46,7 +38,7 @@ export function readPackagedModelFile(path: string, doc: Document = document): P
     script.onload = () => {
       finish()
       if (data === null) { reject(new Error(`${path}: not a packaged model file`)); return }
-      try { resolve(decodeBase64(data)) } catch (error) { reject(error) }
+      try { resolve(bytesFromBase64(data).buffer) } catch (error) { reject(error) }
     }
     script.onerror = () => { finish(); reject(new ModelAssetMissing(path)) }
     script.src = api.assets.url(`model/${path}.js`)

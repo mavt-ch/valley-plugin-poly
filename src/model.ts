@@ -55,11 +55,7 @@ export const ETH_BASE = `https://${ETH_HOST}/cookpit-pub-services/v1`
 /** The client id ETH's own gastronomy page sends with every Cookpit request. */
 export const ETH_CLIENT = 'ethz-wcms'
 export const UZH_HOST = 'app.food2050.ch'
-/** Where food2050 keeps its dish pictures. */
-export const UZH_IMAGE_HOST = 'storage.googleapis.com'
 export const UZH_ORGANISATION = 'universitat-zurich'
-export const ETH_WEBSITE = 'https://ethz.ch/de/campus/erleben/gastronomie-und-einkaufen/gastronomie.html'
-export const UZH_WEBSITE = 'https://www.mensa.uzh.ch/de/Standorte-und-Verpflegung.html'
 /** Postcodes ETH's gastronomy page files under Hönggerberg (its own location rule). */
 export const HOENGGERBERG_POSTCODES = ['8093', '8049', '8053']
 /** ETH's Oerlikon postcode; Basel is every 4xxx postcode. Everything else is Zentrum. */
@@ -126,7 +122,6 @@ export function ethZone(facility: EthFacility): EthZone {
   if (/^4\d{3}$/.test(facility.postcode)) return 'basel'
   return 'zentrum'
 }
-export const isHoenggerberg = (facility: EthFacility) => ethZone(facility) === 'hoenggerberg'
 /** The campus tag of an ETH facility: Zentrum is "ETH", Hönggerberg "Höngg"; Oerlikon and Basel have none. */
 export function ethCampus(facility: EthFacility): Campus | null {
   const zone = ethZone(facility)

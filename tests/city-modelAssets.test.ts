@@ -4,7 +4,8 @@ import { join } from 'node:path'
 import type { ValleyPluginApi } from '@valley/plugin-sdk'
 // @ts-expect-error The tooling is plain JavaScript.
 import { MODEL_CALLBACK as TOOLING_CALLBACK, decodeModelAsset, encodeModelAsset, packModel, readModelAsset } from '../tooling/modelAssets.mjs'
-import { MODEL_CALLBACK, ModelAssetMissing, decodeBase64, readPackagedModelFile } from '../src/city/modelAssets'
+import { MODEL_CALLBACK, ModelAssetMissing, readPackagedModelFile } from '../src/city/modelAssets'
+import { bytesFromBase64 } from '../src/base64'
 import { initRuntime } from '../src/city/runtime'
 
 const bytes = new Uint8Array([0, 1, 2, 250, 255, 31, 139, 8])
@@ -42,7 +43,7 @@ describe('packaged model assets', () => {
     const script = encodeModelAsset('tiles/5366_2494.bin.gz', bytes)
     expect(new Uint8Array(decodeModelAsset(script, 'tiles/5366_2494.bin.gz'))).toEqual(bytes)
     expect(() => decodeModelAsset(script, 'tiles/1_1.bin.gz')).toThrow()
-    expect(new Uint8Array(decodeBase64(Buffer.from(bytes).toString('base64')))).toEqual(bytes)
+    expect(bytesFromBase64(Buffer.from(bytes).toString('base64'))).toEqual(bytes)
   })
 
   it('packs a converted model folder file by file', () => {

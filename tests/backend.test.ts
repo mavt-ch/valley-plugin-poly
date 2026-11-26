@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { PluginBackendApi } from '@valley/plugin-sdk'
-import { decode, register } from '../src/backend/index'
+import { register } from '../src/backend/index'
+import { bytesFromBase64, textFromBase64 } from '../src/base64'
 import type { Location, Outlet } from '../src/model'
 import { DISH_IMAGE, ETH_FACILITIES, ETH_ROTAS, ETH_ROTAS_DE, UZH_DINNER, UZH_DISH, UZH_LUNCH, UZH_ORG, UZH_OUTLET } from './fixtures'
 
@@ -137,7 +138,8 @@ describe('backend', () => {
   })
 
   it('decodes UTF-8 bodies and cancels requests on dispose', async () => {
-    expect(decode(base64('Hönggerberg – Zürich'))).toBe('Hönggerberg – Zürich')
+    expect(textFromBase64(base64('Hönggerberg – Zürich'))).toBe('Hönggerberg – Zürich')
+    expect([...bytesFromBase64(base64('\u0000\u00ff'))]).toEqual([0, 0xc3, 0xbf])
     let release = () => {}
     const { dispose, call, fetch } = backend(eth)
     fetch.mockImplementationOnce(() => new Promise(resolve => { release = () => resolve({ status: 200, bodyBase64: base64('{}') }) }))

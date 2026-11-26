@@ -1,4 +1,5 @@
 import type { PluginBackendApi } from '@valley/plugin-sdk'
+import { bytesFromBase64, textFromBase64 } from '../base64'
 import { FACILITIES_URL, LEVELS_URL, LEVEL_ID, PAGE_SIZE, UNITS_URL, exceeded, parseLevels, parseOutlines, parseRooms, query, roomWhere, type Level, type Outline, type Room, type RoomQuery } from '../campus/services'
 
 /**
@@ -14,13 +15,6 @@ const MAX_TILES = 400
 const TILE_PARALLEL = 6
 const MAX_BYTES = 4 * 1024 * 1024
 const MAX_PAGES = 10
-
-function decodeBytes(base64: string): Uint8Array {
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-  return bytes
-}
 
 export function tileUrl(raw: unknown): string {
   const { z, x, y, dark } = (raw ?? {}) as Record<string, unknown>
@@ -71,7 +65,7 @@ export function registerCampus(api: PluginBackendApi): () => Promise<void> {
     for (let page = 0; page < MAX_PAGES; page++) {
       const body = await fetchBody(query(url, { ...params, orderByFields: 'OBJECTID', resultOffset: String(page * PAGE_SIZE), resultRecordCount: String(PAGE_SIZE) }), { Accept: 'application/geo+json, application/json' }, MAX_BYTES)
       let parsed: unknown
-      try { parsed = JSON.parse(new TextDecoder().decode(decodeBytes(body))) } catch { throw new Error('formatError') }
+      try { parsed = JSON.parse(textFromBase64(body)) } catch { throw new Error('formatError') }
       const rows = parse(parsed)
       result.push(...rows)
       if (!exceeded(parsed) && rows.length < PAGE_SIZE) break
@@ -105,7 +99,7 @@ export function registerCampus(api: PluginBackendApi): () => Promise<void> {
     const value = (async () => {
       while (running >= TILE_PARALLEL) await new Promise<void>(resolve => waiting.push(resolve))
       running++
-      try { return decodeBytes(await fetchBody(url, { 'User-Agent': TILE_CLIENT, Accept: 'image/jpeg, image/png' }, 1_000_000)).buffer as ArrayBuffer }
+      try { return bytesFromBase64(await fetchBody(url, { 'User-Agent': TILE_CLIENT, Accept: 'image/jpeg, image/png' }, 1_000_000)).buffer as ArrayBuffer }
       finally { running--; waiting.shift()?.() }
     })()
     tiles.set(url, value)
@@ -120,7 +114,7 @@ export function registerCampus(api: PluginBackendApi): () => Promise<void> {
     if (!where) throw new Error('invalidInput')
     return remember(`search:${where}`, false, async (): Promise<Room[]> => {
       const body = await fetchBody(query(UNITS_URL, { where, outFields: 'UNIT_ID,NAME,USE_TYPE,RaumNr,RaumTyp,LEVEL_ID', orderByFields: 'NAME', resultRecordCount: '40', geometryPrecision: '7' }), { Accept: 'application/geo+json, application/json' }, MAX_BYTES)
-      try { return parseRooms(JSON.parse(new TextDecoder().decode(decodeBytes(body)))) } catch (error) { throw error instanceof Error && error.message === 'formatError' ? error : new Error('formatError') }
+      try { return parseRooms(JSON.parse(textFromBase64(body))) } catch (error) { throw error instanceof Error && error.message === 'formatError' ? error : new Error('formatError') }
     })
   }
 

@@ -15,7 +15,6 @@ export const ELINK_STOPS = {
 export const ELINK_BOARDS = [ELINK_STOPS.zentrum, ELINK_STOPS.hoengg, ELINK_STOPS.hb] as const
 export const ELINK_HOST = 'transport.opendata.ch'
 export const ELINK_LINE = 'E'
-export const ELINK_OPERATOR = 'VBG'
 /** The most departures transport.opendata.ch answers per request (a larger limit is refused). */
 export const ELINK_PAGE = 420
 /** At most this many pages per stop and day (a full day at ETH Hönggerberg takes two). */
