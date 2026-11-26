@@ -1,11 +1,12 @@
 /**
- * The menu plan's two surfaces:
- * - `study.panel` (left sidebar, an Icon Rail entry): Lunch | Dinner and the page button, the campus
- *   tags (ETH, Höngg, UZH), the day, then one row per place with its location, opening state and
- *   number of menus;
- * - `study.page` (main workspace): one place's menus as picture cards (`instanceId` `place:<id>`),
- *   or, without an instance, every place of the chosen campus.
- * Both share the day, meal, campus, filters and price through the plugin's settings.
+ * Poly's two surfaces:
+ * - `poly.panel` (left sidebar, an Icon Rail entry): row 1 the shown feature's name and the page button,
+ *   row 2 the feature tabs (Menu plan, Campus map) drawn like Map's sidebar tabs, then the feature's body:
+ *   for the menu plan the campus tags (ETH, Höngg, UZH), the day with Lunch | Dinner and one row per place;
+ *   for the campus map the building search, the selected building and the buildings by campus;
+ * - `poly.page` (main workspace): one place's menus as picture cards (`instanceId` `place:<id>`),
+ *   without an instance every place of the chosen campus, and with `campus` the campus map (2D | 3D).
+ * Both share the tab, day, meal, campus, filters, price and selected building through the plugin's settings.
  */
 import type { ValleyPluginApi } from '@valley/plugin-sdk'
 import { paletteCssContrast, paletteCssValue } from '@valley/plugin-sdk/palette'
@@ -13,119 +14,140 @@ import {
   CAMPUSES, addDays, defaultService, dishesOf, formatPrice, hasFilters, priceFor, pricesInOrder, isDate, menuOf, mondayOf, openState, openingOf, placeInstance, placeOf, sourceLanguage, today,
   type Campus, type Dish, type DishDetail, type Filters, type Location, type Outlet, type Price, type PriceGroup, type Service
 } from './model'
+import { CampusPanelBody, PIN } from './campus/Panel'
+import { CampusPage } from './campus/Page'
+import { isCampusInstance, openCampus } from './campus/store'
+import { BUS_ICON, createElinkViews } from './elink/views'
+import { isElinkInstance } from './elink/model'
 
 export const VIEWS_CSS = `
-.study-panel, .study-page { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
-.study-page { background: var(--background-color, transparent); container-type: inline-size; }
-.study-bar { display: flex; align-items: center; gap: 6px; height: var(--app-bar-height); box-sizing: border-box; padding: 0 6px; border-bottom: 1px solid var(--border-light); flex-shrink: 0; }
-.study-page .study-bar { gap: 8px; padding: 0 12px; }
+.poly-panel, .poly-page { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
+.poly-page { background: var(--background-color, transparent); container-type: inline-size; }
+.poly-bar { display: flex; align-items: center; gap: 6px; height: var(--app-bar-height); box-sizing: border-box; padding: 0 6px; border-bottom: 1px solid var(--border-light); flex-shrink: 0; }
+.poly-page .poly-bar { gap: 8px; padding: 0 12px; }
 /* The host draws back/forward at the start and its menu at the end of the page's first row. */
-.study-page .study-bar.study-page-head { padding-left: calc(var(--plugin-navigation-offset, 60px) + var(--space-2, 6px)); padding-right: calc(var(--plugin-actions-offset, 36px) + var(--space-2, 6px)); }
-.study-spacer { flex: 1; min-width: 0; }
-.study-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
-.study-seg { display: flex; flex: 0 0 auto; min-width: 0; gap: 2px; padding: 2px; border-radius: var(--shell-control-radius, 6px); background: var(--hover-bg); }
-.study-seg button { flex: 0 0 auto; height: calc(var(--shell-control-toolbar, 24px) - 4px); padding: 0 7px; border: 0; border-radius: calc(var(--shell-control-radius, 6px) - 2px); background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--small-font-size); white-space: nowrap; cursor: pointer; }
-.study-page .study-seg button { height: calc(var(--search-field-height, 26px) - 4px); padding: 0 10px; }
-.study-seg button:hover { color: var(--text-color); }
-.study-seg button.active { background: var(--background-color, var(--container-color)); color: var(--title-color); box-shadow: 0 0 0 1px var(--border-light); }
-.study-seg button:focus-visible, .study-icon-btn:focus-visible, .study-day-label:focus-visible, .study-place:focus-visible, .study-card:focus-visible, .study-tile:focus-visible, .study-place-link:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -2px; }
-.study-day { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; }
-.study-day-label { flex: 1; min-width: 0; height: var(--search-field-height, 26px); padding: 0 2px; border: 0; border-radius: var(--radius-sm, 4px); background: transparent; color: var(--title-color); font: inherit; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
-.study-day-label:hover { background: var(--hover-bg); }
-.study-day-label.today { color: var(--accent-color); }
-.study-icon-btn { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: var(--shell-control-toolbar, 24px); height: var(--shell-control-toolbar, 24px); padding: 0; border: 0; border-radius: var(--shell-control-radius, 4px); background: transparent; color: var(--text-secondary); cursor: pointer; }
-.study-icon-btn:hover { background: var(--hover-bg); color: var(--text-color); }
-.study-icon-btn.active { background: var(--accent-tint-bg); color: var(--title-color); }
-.study-icon-btn svg { width: var(--shell-glyph-default, 15px); height: var(--shell-glyph-default, 15px); }
-.study-icon-btn.spinning svg { animation: study-spin 0.9s linear infinite; }
-@keyframes study-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .study-icon-btn.spinning svg { animation: none; } }
+.poly-page .poly-bar.poly-page-head { padding-left: calc(var(--plugin-navigation-offset, 60px) + var(--space-2, 6px)); padding-right: calc(var(--plugin-actions-offset, 36px) + var(--space-2, 6px)); }
+.poly-spacer { flex: 1; min-width: 0; }
+.poly-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.poly-seg { display: flex; flex: 0 0 auto; min-width: 0; gap: 2px; padding: 2px; border-radius: var(--shell-control-radius, 6px); background: var(--hover-bg); }
+.poly-seg button { flex: 0 0 auto; height: calc(var(--shell-control-toolbar, 24px) - 4px); padding: 0 7px; border: 0; border-radius: calc(var(--shell-control-radius, 6px) - 2px); background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--small-font-size); white-space: nowrap; cursor: pointer; }
+.poly-page .poly-seg button { height: calc(var(--search-field-height, 26px) - 4px); padding: 0 10px; }
+.poly-seg button:hover { color: var(--text-color); }
+.poly-panel .poly-bar:not(.poly-tiles) { gap: 2px; }
+.poly-panel .poly-bar .poly-seg { margin: 0 2px; }
+.poly-panel .poly-bar .poly-seg button { padding: 0 6px; }
+.poly-seg button.active { background: var(--background-color, var(--container-color)); color: var(--title-color); box-shadow: 0 0 0 1px var(--border-light); }
+.poly-seg button:focus-visible, .poly-icon-btn:focus-visible, .poly-day-label:focus-visible, .poly-place:focus-visible, .poly-card:focus-visible, .poly-tile:focus-visible, .poly-place-link:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -2px; }
+.poly-day { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; }
+.poly-day-label { flex: 1; min-width: 0; height: var(--search-field-height, 26px); padding: 0 2px; border: 0; border-radius: var(--radius-sm, 4px); background: transparent; color: var(--title-color); font: inherit; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.poly-day-label:hover { background: var(--hover-bg); }
+.poly-day-label.today { color: var(--accent-color); }
+/* The menu plan's week: Monday to Sunday with their dates between the week chevrons; today in the accent colour, the chosen day filled. */
+.poly-week-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; flex: 1; min-width: 0; }
+.poly-week-day { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 0; height: 32px; padding: 0; border: 0; border-radius: var(--radius-sm, 4px); background: transparent; color: var(--text-secondary); font: inherit; line-height: 1; cursor: pointer; }
+.poly-week-day:hover { background: var(--hover-bg); color: var(--text-color); }
+.poly-week-name { max-width: 100%; overflow: hidden; font-size: var(--smaller-font-size); white-space: nowrap; }
+.poly-week-date { color: var(--title-color); font-size: var(--small-font-size); font-weight: 600; font-variant-numeric: tabular-nums; }
+.poly-week-day.today, .poly-week-day.today .poly-week-date { color: var(--accent-color); }
+.poly-week-day.selected { background: var(--accent-tint-bg); }
+.poly-week-day.selected:not(.today) { color: var(--title-color); }
+.poly-week-day:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -2px; }
+.poly-icon-btn:disabled { opacity: 0.4; cursor: default; background: transparent; }
+.poly-groups { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.poly-divider { width: 1px; height: 16px; margin: 0 3px; background: var(--border-light); flex-shrink: 0; }
+.poly-icon-btn { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: var(--shell-control-toolbar, 24px); height: var(--shell-control-toolbar, 24px); padding: 0; border: 0; border-radius: var(--shell-control-radius, 4px); background: transparent; color: var(--text-secondary); cursor: pointer; }
+.poly-icon-btn:hover { background: var(--hover-bg); color: var(--text-color); }
+.poly-icon-btn.active { background: var(--accent-tint-bg); color: var(--title-color); }
+.poly-icon-btn svg { width: var(--shell-glyph-default, 15px); height: var(--shell-glyph-default, 15px); }
+.poly-icon-btn.spinning svg { animation: poly-spin 0.9s linear infinite; }
+@keyframes poly-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .poly-icon-btn.spinning svg { animation: none; } }
 /* Campus tags: To-Do's smart-list chips (icon tinted in the tag's colour, filled when active) with the 6px corners of Contacts' group tags. */
-.study-tiles { gap: 4px; padding: 0 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
-.study-tiles::-webkit-scrollbar { display: none; }
-.study-tile { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; box-sizing: border-box; height: 28px; padding: 0 10px; border: 1px solid var(--border-light); border-radius: 6px; background: var(--surface-color-alt); color: var(--text-secondary); font-family: var(--interface-font); font-size: var(--small-font-size); line-height: 1; cursor: pointer; }
-.study-tile:hover { background: var(--hover-bg); color: var(--text-color); }
-.study-tile-icon { display: grid; place-items: center; width: 15px; height: 15px; flex-shrink: 0; color: var(--study-tile-color, var(--text-tertiary)); }
-.study-tile-icon svg { width: 15px; height: 15px; }
-.study-tile-count { color: var(--text-tertiary); font-size: var(--smaller-font-size); font-variant-numeric: tabular-nums; }
-.study-tile.active { background: var(--study-tile-color, var(--accent-color)); border-color: var(--study-tile-color, var(--accent-color)); color: var(--study-tile-on, var(--title-color)); }
-.study-tile.active .study-tile-icon, .study-tile.active .study-tile-count { color: inherit; }
-.study-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 6px 12px; }
-.study-page .study-list, .study-panel .study-list { padding: 0; }
-.study-page-inner { max-width: 1240px; margin: 0 auto; padding: 18px 24px 36px; }
-.study-note { padding: 8px 10px; color: var(--text-secondary); font-size: var(--small-font-size); }
-.study-page .study-note { padding: 8px 2px; }
-.study-note.error { color: var(--tint-red-text, var(--text-secondary)); }
-.study-campus { padding: 10px 8px 2px; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.poly-tiles { gap: 4px; padding: 0 5px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
+.poly-tiles::-webkit-scrollbar { display: none; }
+.poly-tile { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; box-sizing: border-box; height: 28px; padding: 0 10px; border: 1px solid var(--border-light); border-radius: 6px; background: var(--surface-color-alt); color: var(--text-secondary); font-family: var(--interface-font); font-size: var(--small-font-size); line-height: 1; cursor: pointer; }
+.poly-tile:hover { background: var(--hover-bg); color: var(--text-color); }
+.poly-tile-icon { display: grid; place-items: center; width: 15px; height: 15px; flex-shrink: 0; color: var(--poly-tile-color, var(--text-tertiary)); }
+.poly-tile-icon svg { width: 15px; height: 15px; }
+.poly-tile-count { color: var(--text-tertiary); font-size: var(--smaller-font-size); font-variant-numeric: tabular-nums; }
+.poly-tile.active { background: var(--poly-tile-color, var(--accent-color)); border-color: var(--poly-tile-color, var(--accent-color)); color: var(--poly-tile-on, var(--title-color)); }
+.poly-tile.active .poly-tile-icon, .poly-tile.active .poly-tile-count { color: inherit; }
+.poly-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 6px 12px; }
+.poly-page .poly-list, .poly-panel .poly-list { padding: 0; }
+.poly-page-inner { max-width: 1240px; margin: 0 auto; padding: 18px 24px 36px; }
+.poly-note { padding: 8px 10px; color: var(--text-secondary); font-size: var(--small-font-size); }
+.poly-page .poly-note { padding: 8px 2px; }
+.poly-note.error { color: var(--tint-red-text, var(--text-secondary)); }
+.poly-campus { padding: 10px 8px 2px; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
 /* Place rows follow Email's message list (full width, no inset or rounding, a hairline between rows) and Contacts' selection (accent tint, accent name). */
-.study-place { display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: baseline; gap: 2px 8px; width: 100%; box-sizing: border-box; margin: 0; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--border-light); border-radius: 0; background: transparent; color: var(--text-color); font: inherit; text-align: left; cursor: pointer; transition: background-color 120ms ease-out; }
-.study-place:hover { background: color-mix(in srgb, var(--title-color) 5%, transparent); }
+.poly-place { display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: baseline; gap: 2px 8px; width: 100%; box-sizing: border-box; margin: 0; padding: 10px 12px; border: 0; border-bottom: 1px solid var(--border-light); border-radius: 0; background: transparent; color: var(--text-color); font: inherit; text-align: left; cursor: pointer; transition: background-color 120ms ease-out; }
+.poly-place:hover { background: color-mix(in srgb, var(--title-color) 5%, transparent); }
 /* Each row carries a favourite star at its right edge, outside the row button; filled yellow when it is a favourite. */
-.study-place-item { position: relative; }
-.study-place-item .study-place { padding-right: 38px; }
-.study-place-item > .study-star { position: absolute; top: 8px; right: 8px; }
-.study-star { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: var(--shell-control-toolbar, 24px); height: var(--shell-control-toolbar, 24px); padding: 0; border: 0; border-radius: var(--shell-control-radius, 4px); background: transparent; color: var(--text-tertiary, var(--text-secondary)); cursor: pointer; }
-.study-star:hover { background: var(--hover-bg); color: var(--text-color); }
-.study-star svg { width: 15px; height: 15px; }
-.study-star.on, .study-star.on:hover { color: var(--color-yellow, #e5b33a); }
-.study-star.on svg { fill: currentColor; }
-.study-star:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -2px; }
-.study-place.active { background: var(--accent-tint-bg); }
-.study-place.active .study-place-name { color: var(--accent-color); }
-@media (prefers-reduced-motion: reduce) { .study-place { transition: none; } }
-.study-panel .study-note { padding: 10px 12px; }
-.study-panel .study-credit { padding: 10px 12px 12px; }
-.study-place-name { min-width: 0; color: var(--title-color); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.study-place-count { color: var(--text-secondary); font-size: var(--small-font-size); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.study-place-count.pending { color: var(--text-tertiary, var(--text-secondary)); }
-.study-place-meta { grid-column: 1 / -1; min-width: 0; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.study-open { color: var(--tint-green-text, var(--text-secondary)); }
-.study-closed { color: var(--text-secondary); }
+.poly-place-item { position: relative; }
+.poly-place-item .poly-place { padding-right: 38px; }
+.poly-place-item > .poly-star { position: absolute; top: 8px; right: 8px; }
+.poly-star { display: flex; align-items: center; justify-content: center; flex-shrink: 0; width: var(--shell-control-toolbar, 24px); height: var(--shell-control-toolbar, 24px); padding: 0; border: 0; border-radius: var(--shell-control-radius, 4px); background: transparent; color: var(--text-tertiary, var(--text-secondary)); cursor: pointer; }
+.poly-star:hover { background: var(--hover-bg); color: var(--text-color); }
+.poly-star svg { width: 15px; height: 15px; }
+.poly-star.on, .poly-star.on:hover { color: var(--color-yellow, #e5b33a); }
+.poly-star.on svg { fill: currentColor; }
+.poly-star:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -2px; }
+.poly-place.active { background: var(--accent-tint-bg); }
+.poly-place.active .poly-place-name { color: var(--accent-color); }
+@media (prefers-reduced-motion: reduce) { .poly-place { transition: none; } }
+.poly-panel .poly-note { padding: 10px 12px; }
+.poly-panel .poly-credit { padding: 10px 12px 12px; }
+.poly-place-name { min-width: 0; color: var(--title-color); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.poly-place-count { color: var(--text-secondary); font-size: var(--small-font-size); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.poly-place-count.pending { color: var(--text-tertiary, var(--text-secondary)); }
+.poly-place-meta { grid-column: 1 / -1; min-width: 0; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.poly-open { color: var(--tint-green-text, var(--text-secondary)); }
+.poly-closed { color: var(--text-secondary); }
 /* The page's first bar names the place (or the campus) only; day, meal and filters live in the sidebar. */
-.study-page-title { flex: 1; min-width: 0; margin: 0; color: var(--title-color); font-size: var(--normal-font-size, 1rem); font-weight: 600; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.study-page-head .study-bar-balance { width: var(--shell-control-toolbar, 24px); flex-shrink: 0; }
-.study-page-head .study-bar-balance.double { width: calc(var(--shell-control-toolbar, 24px) * 2 + 8px); }
+.poly-page-title { flex: 1; min-width: 0; margin: 0; color: var(--title-color); font-size: var(--normal-font-size, 1rem); font-weight: 600; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.poly-page-head .poly-bar-balance { width: var(--shell-control-toolbar, 24px); flex-shrink: 0; }
+.poly-page-head .poly-bar-balance.double { width: calc(var(--shell-control-toolbar, 24px) * 2 + 8px); }
 /* A place's facts: a fixed, centred second bar (37px + 1px line) that never scrolls or wraps; the location gives way first. */
-.study-page .study-bar.study-facts { padding: 0; overflow: hidden; }
-.study-facts-inner { display: flex; align-items: center; justify-content: center; gap: 14px; width: 100%; padding: 0 24px; box-sizing: border-box; overflow: hidden; white-space: nowrap; color: var(--text-secondary); font-size: var(--small-font-size); }
-.study-facts-inner > span { flex-shrink: 0; }
-.study-facts-inner > .study-facts-where { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.study-section + .study-section { margin-top: 22px; }
-.study-place-link { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 4px 2px 8px; border: 0; border-radius: var(--radius-sm, 4px); background: transparent; color: var(--title-color); font: inherit; text-align: left; cursor: pointer; }
-.study-place-link:hover .study-place-link-name { text-decoration: underline; }
-.study-place-link-name { font-size: 1.15rem; font-weight: 600; }
-.study-place-link-meta { min-width: 0; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--small-font-size); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.poly-page .poly-bar.poly-facts { padding: 0; overflow: hidden; }
+.poly-facts-inner { display: flex; align-items: center; justify-content: center; gap: 14px; width: 100%; padding: 0 24px; box-sizing: border-box; overflow: hidden; white-space: nowrap; color: var(--text-secondary); font-size: var(--small-font-size); }
+.poly-facts-inner > span { flex-shrink: 0; }
+.poly-facts-inner > .poly-facts-where { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.poly-section + .poly-section { margin-top: 22px; }
+.poly-place-link { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 4px 2px 8px; border: 0; border-radius: var(--radius-sm, 4px); background: transparent; color: var(--title-color); font: inherit; text-align: left; cursor: pointer; }
+.poly-place-link:hover .poly-place-link-name { text-decoration: underline; }
+.poly-place-link-name { font-size: 1.15rem; font-weight: 600; }
+.poly-place-link-meta { min-width: 0; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--small-font-size); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Line and prices share a row; when the line's name does not fit beside the prices, the prices drop to their own row (right-aligned) instead of cutting the name. */
-.study-dish-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; min-width: 0; }
-.study-dish-top .study-dish-price { margin-left: auto; }
-.study-dish-line { flex: 1 1 auto; min-width: 0; max-width: 100%; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); text-transform: uppercase; letter-spacing: 0.04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.study-dish-price { flex-shrink: 0; color: var(--text-secondary); font-size: var(--small-font-size); font-variant-numeric: tabular-nums; }
-.study-dish-name { color: var(--title-color); font-weight: 600; overflow-wrap: anywhere; }
-.study-dish-description { color: var(--text-secondary); font-size: var(--small-font-size); overflow-wrap: anywhere; }
-.study-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
-.study-tag { padding: 0 6px; border-radius: 999px; background: var(--hover-bg); color: var(--text-secondary); font-size: var(--smaller-font-size); line-height: 1.6; }
-.study-tag.vegan, .study-tag.vegetarian, .study-tag.glutenFree, .study-tag.lactoseFree, .study-tag.LOW { background: var(--tint-green-bg, var(--hover-bg)); color: var(--tint-green-text, var(--text-secondary)); }
-.study-tag.HIGH { background: var(--tint-orange-bg, var(--hover-bg)); color: var(--tint-orange-text, var(--text-secondary)); }
-.study-dish-allergens { margin-top: 2px; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); overflow-wrap: anywhere; }
-.study-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; padding: 2px 0 4px; }
-.study-card { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid var(--border-light); border-radius: 8px; background: var(--container-color, transparent); color: var(--text-color); }
-.study-card-image { position: relative; aspect-ratio: 3 / 2; background: var(--hover-bg); display: grid; place-items: center; color: var(--text-tertiary, var(--text-secondary)); }
-.study-card-image svg { width: 30px; height: 30px; opacity: 0.6; }
-.study-card-image img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.study-card-body { display: grid; gap: 3px; padding: 10px 12px 12px; }
-.study-card .study-dish-name { font-size: 1rem; }
-.study-card .study-dish-description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+.poly-dish-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 8px; min-width: 0; }
+.poly-dish-top .poly-dish-price { margin-left: auto; }
+.poly-dish-line { flex: 1 1 auto; min-width: 0; max-width: 100%; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); text-transform: uppercase; letter-spacing: 0.04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.poly-dish-price { flex-shrink: 0; color: var(--text-secondary); font-size: var(--small-font-size); font-variant-numeric: tabular-nums; }
+.poly-dish-name { color: var(--title-color); font-weight: 600; overflow-wrap: anywhere; }
+.poly-dish-description { color: var(--text-secondary); font-size: var(--small-font-size); overflow-wrap: anywhere; }
+.poly-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.poly-tag { padding: 0 6px; border-radius: 999px; background: var(--hover-bg); color: var(--text-secondary); font-size: var(--smaller-font-size); line-height: 1.6; }
+.poly-tag.vegan, .poly-tag.vegetarian, .poly-tag.glutenFree, .poly-tag.lactoseFree, .poly-tag.LOW { background: var(--tint-green-bg, var(--hover-bg)); color: var(--tint-green-text, var(--text-secondary)); }
+.poly-tag.HIGH { background: var(--tint-orange-bg, var(--hover-bg)); color: var(--tint-orange-text, var(--text-secondary)); }
+.poly-dish-allergens { margin-top: 2px; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); overflow-wrap: anywhere; }
+.poly-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; padding: 2px 0 4px; }
+.poly-card { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid var(--border-light); border-radius: 8px; background: var(--container-color, transparent); color: var(--text-color); }
+.poly-card-image { position: relative; aspect-ratio: 3 / 2; background: var(--hover-bg); display: grid; place-items: center; color: var(--text-tertiary, var(--text-secondary)); }
+.poly-card-image svg { width: 30px; height: 30px; opacity: 0.6; }
+.poly-card-image img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.poly-card-body { display: grid; gap: 3px; padding: 10px 12px 12px; }
+.poly-card .poly-dish-name { font-size: 1rem; }
+.poly-card .poly-dish-description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
 /* A narrow page lays each card out as a row: picture left, text right. */
 @container (max-width: 560px) {
-  .study-page-inner { padding: 10px 12px 28px; }
-  .study-facts-inner { padding: 0 12px; }
-  .study-cards { grid-template-columns: minmax(0, 1fr); gap: 8px; }
-  .study-card { flex-direction: row; align-items: stretch; }
-  .study-card-image { flex: 0 0 112px; aspect-ratio: auto; min-height: 112px; }
-  .study-card-body { flex: 1; min-width: 0; padding: 8px 10px; }
+  .poly-page-inner { padding: 10px 12px 28px; }
+  .poly-facts-inner { padding: 0 12px; }
+  .poly-cards { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .poly-card { flex-direction: row; align-items: stretch; }
+  .poly-card-image { flex: 0 0 112px; aspect-ratio: auto; min-height: 112px; }
+  .poly-card-body { flex: 1; min-width: 0; padding: 8px 10px; }
 }
-.study-credit { padding: 10px 8px 0; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); }
-.study-page .study-credit { padding: 28px 2px 0; }
+.poly-credit { padding: 10px 8px 0; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); }
+.poly-page .poly-credit { padding: 28px 2px 0; }
 `
 
 type Shapes = string[]
@@ -135,8 +157,22 @@ const REFRESH: Shapes = ['M20 11a8 8 0 0 0-14.9-3.9L4 8.5', 'M4 4v4.5h4.5', 'M4 
 const OPEN: Shapes = ['M14 4h6v6', 'M20 4l-9 9', 'M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5']
 const TAB: Shapes = ['M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z', 'M4 9h16', 'M10 4v5']
 const DISH: Shapes = ['M6 3v7a2 2 0 0 0 2 2a2 2 0 0 0 2-2V3', 'M8 3v18', 'M17 21V3c-2.2 1.2-3.5 3.8-3.5 7.2V13a1 1 0 0 0 1 1H17']
-const FILTER: Shapes = ['M4 5h16l-6 7.5V19l-4 1.5v-8z']
-const CASH: Shapes = ['M3 7a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z', 'M9.5 12a2.5 2.5 0 1 0 5 0a2.5 2.5 0 1 0-5 0', 'M6 9.5v.01', 'M18 14.5v.01']
+/** Food filter: a salad bowl with a leaf. */
+const FILTER: Shapes = ['M3.5 11.5h17a8.5 6.5 0 0 1-17 0z', 'M9 20.5h6', 'M12 11.5c0-3.6 2.1-6.2 6.3-6.8 0 3.9-2.5 6.4-6.3 6.8', 'M12 11.5l3.2-3.2', 'M9.6 11.5c-.3-2.1-1.7-3.5-3.8-3.8']
+/** Whose prices: a graduation cap for students, a briefcase for staff, a person for guests. */
+const GROUP_ICONS: Record<PriceGroup, Shapes> = {
+  students: ['M2.5 9.5L12 5.5l9.5 4-9.5 4z', 'M6.5 11.5v4c0 1.4 2.5 2.5 5.5 2.5s5.5-1.1 5.5-2.5v-4', 'M21.5 9.5v5'],
+  internal: ['M4 8h16a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z', 'M9 8V6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2', 'M3 13h18'],
+  external: ['M8.5 7.5a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0-7 0', 'M5 20c0-3.9 3.1-6 7-6s7 2.1 7 6']
+}
+const NO = 'M4 4l16 16'
+/** The diet filters: a leaf, a sprout, crossed-out wheat, a crossed-out milk carton. */
+const FILTER_ICONS: Record<keyof Filters, Shapes> = {
+  vegetarian: ['M5 19c0-8 5-13.5 14-14 0 9-5 14-13 14', 'M5 19l7.5-7.5'],
+  vegan: ['M12 20v-8', 'M12 12c0-3.3-2.7-6-6-6H4v1c0 3.3 2.7 6 6 6h2', 'M12 10c0-3.3 2.7-6 6-6h2v1c0 3.3-2.7 6-6 6h-2'],
+  glutenFree: ['M12 21V8', 'M12 8c-1.7-.8-2.8-2.4-2.8-4.5 1.7.8 2.8 2.4 2.8 4.5z', 'M12 8c1.7-.8 2.8-2.4 2.8-4.5-1.7.8-2.8 2.4-2.8 4.5z', 'M12 13.5c-1.9-.6-3.3-2.1-3.5-4.2 1.9.6 3.3 2.1 3.5 4.2z', 'M12 13.5c1.9-.6 3.3-2.1 3.5-4.2-1.9.6-3.3 2.1-3.5 4.2z', NO],
+  lactoseFree: ['M8.5 3h7', 'M9 3v3L7 9.5V20a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9.5L15 6V3', 'M7 12.5h10', NO]
+}
 /**
  * ETH Zentrum: the main building seen from the Polyterrasse (long wings, the raised centre with its
  * two columns, arched door and flagpole); Höngg: the hill; UZH: the main building's round tower with
@@ -147,6 +183,15 @@ const CAMPUS_ICONS: Record<Campus, Shapes> = {
   hoengg: ['M3 19h18', 'M3 19l6-9 4 5 3-3 5 7', 'M15 6.5a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0'],
   uzh: ['M2 20h20', 'M3 20v-6l1.5-2h4', 'M15.5 12h4l1.5 2v6', 'M8.5 20v-9h7v9', 'M8.5 11a3.5 3.5 0 0 1 7 0', 'M12 7.5V6', 'M10.5 20v-2.5a1.5 1.5 0 0 1 3 0V20', 'M5.5 16.5h.01', 'M18.5 16.5h.01']
 }
+/**
+ * The sidebar's feature tabs (row 2): the eLink shuttle (a bus, first; 25 Nov), the menu plan (fork and
+ * knife) and the campus map (a location pin), saved in the hidden `mode` setting. 2.0.0 saved the campus
+ * map's predecessor, Zürich 3D, as `city`.
+ */
+export type Mode = 'elink' | 'menu' | 'campus'
+export const MODES: Mode[] = ['elink', 'menu', 'campus']
+const MODE_ICONS: Record<Mode, Shapes> = { elink: BUS_ICON, menu: DISH, campus: PIN }
+export const modeOf = (value: unknown): Mode => value === 'elink' ? 'elink' : value === 'campus' || value === 'city' ? 'campus' : 'menu'
 const STAR: Shapes = ['M12 3.6l2.6 5.25 5.8.85-4.2 4.1 1 5.8L12 16.85 6.8 19.6l1-5.8-4.2-4.1 5.8-.85z']
 /** The tags of row 2: Favorites first (shown once a place is starred), then the campuses. */
 type Tag = 'favorites' | Campus
@@ -162,7 +207,7 @@ const FILTER_KEYS = [['vegetarian', 'onlyVegetarian'], ['vegan', 'onlyVegan'], [
 type State<T> = { data: T | null; error: string; loading: boolean }
 type Day = { date: string; service: Service }
 
-export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: string) => string }): void {
+export function registerPolyViews(api: ValleyPluginApi, { t }: { t: (key: string) => string }): void {
   const React = api.React
   const h = React.createElement
   type Node = ReturnType<typeof h>
@@ -174,11 +219,11 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
   const strings = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
   const menusLabel = (count: number) => count === 1 ? t('menus.one') : fill(t('menus.other'), { count })
 
-  /** The shared day: a stored day before today falls back to today and the meal of the hour. */
+  /** The shared day: a stored day before this week's Monday falls back to today and the meal of the hour. */
   function dayOf(value: unknown): Day {
     const stored = value && typeof value === 'object' ? value as Partial<Day> : {}
     const now = today()
-    if (!isDate(stored.date) || stored.date < now) return { date: now, service: defaultService() }
+    if (!isDate(stored.date) || stored.date < mondayOf(now)) return { date: now, service: defaultService() }
     return { date: stored.date, service: stored.service === 'dinner' ? 'dinner' : 'lunch' }
   }
 
@@ -193,6 +238,7 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     return {
       language: sourceLanguage(api.ui.language()),
       locale: api.ui.language() || 'en',
+      mode: modeOf(settings.mode),
       campus: (TAGS.includes(settings.campus as Tag) ? settings.campus : 'hoengg') as Tag,
       favorites: strings(settings.favorites),
       prices: (PRICE_CHOICES.includes(settings.prices as PriceShown) ? settings.prices : 'all') as PriceShown,
@@ -295,7 +341,7 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
   }
   const Tags = ({ dish }: { dish: Dish }): Node | null => {
     const tags = tagsOf(dish)
-    return tags.length ? h('span', { className: 'study-tags' }, tags.map(tag => h('span', { key: `${tag.key}:${tag.label}`, className: `study-tag ${tag.key}` }, tag.label))) : null
+    return tags.length ? h('span', { className: 'poly-tags' }, tags.map(tag => h('span', { key: `${tag.key}:${tag.label}`, className: `poly-tag ${tag.key}` }, tag.label))) : null
   }
 
   /**
@@ -311,17 +357,17 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     const picture = useAnswer<string>(visible && source ? source : null, 0, () => api.backend.call<string>('image', { url: source }))
     const prices = dish.prices.length ? dish.prices : detail.data?.prices ?? []
     const price = priceLine(prices, shown)
-    return h('div', { ref, className: 'study-card', 'data-dish': dish.id },
-      h('span', { className: 'study-card-image' },
+    return h('div', { ref, className: 'poly-card', 'data-dish': dish.id },
+      h('span', { className: 'poly-card-image' },
         h(Icon, { shapes: DISH }),
         picture.data ? h('img', { src: picture.data, alt: dish.name, draggable: false }) : null),
-      h('span', { className: 'study-card-body' },
-        h('span', { className: 'study-dish-top' },
-          h('span', { className: 'study-dish-line' }, dish.line),
-          price.short ? h('span', { className: 'study-dish-price', title: price.long, 'aria-label': price.long }, price.short) : null),
-        h('span', { className: 'study-dish-name' }, dish.name),
-        dish.description ? h('span', { className: 'study-dish-description' }, dish.description) : null,
-        h('span', { className: 'study-dish-allergens' }, dish.allergens.length ? `${t('allergens')}: ${dish.allergens.join(', ')}` : t('allergens.none')),
+      h('span', { className: 'poly-card-body' },
+        h('span', { className: 'poly-dish-top' },
+          h('span', { className: 'poly-dish-line' }, dish.line),
+          price.short ? h('span', { className: 'poly-dish-price', title: price.long, 'aria-label': price.long }, price.short) : null),
+        h('span', { className: 'poly-dish-name' }, dish.name),
+        dish.description ? h('span', { className: 'poly-dish-description' }, dish.description) : null,
+        h('span', { className: 'poly-dish-allergens' }, dish.allergens.length ? `${t('allergens')}: ${dish.allergens.join(', ')}` : t('allergens.none')),
         h(Tags, { dish })))
   }
 
@@ -331,8 +377,8 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     if (!hours) return null
     const range = `${hours.from}–${hours.to}`
     const state = openState(hours, date)
-    if (state === 'open') return h('span', { className: 'study-open' }, fill(t('hours.openNow'), { hours: range }))
-    if (state === 'closed') return h('span', { className: 'study-closed' }, fill(t('hours.closed'), { hours: range }))
+    if (state === 'open') return h('span', { className: 'poly-open' }, fill(t('hours.openNow'), { hours: range }))
+    if (state === 'closed') return h('span', { className: 'poly-closed' }, fill(t('hours.closed'), { hours: range }))
     return h('span', null, fill(t('hours.open'), { hours: range }))
   }
   const where = (location: Location) => [location.area, location.place].filter(Boolean).join(' · ')
@@ -351,18 +397,14 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     if (choice === 'refresh') refresh()
   }
 
-  /** Whose prices the cards show, beside the filter: all of them, or students', staff's or guests'. */
-  function PriceButton({ preferences }: { preferences: Preferences }): Node {
-    const active = preferences.prices !== 'all'
-    const pick = async (event: MouseEvent) => {
-      const choice = await api.ui.openMenu(PRICE_CHOICES.flatMap((value, index) => [
-        ...(index === 1 ? [{ type: 'separator' as const }] : []),
-        { id: value, type: 'radio' as const, label: t(value === 'all' ? 'prices.all' : `price.${value}`), checked: preferences.prices === value }
-      ]), { anchor: event.currentTarget as HTMLElement, align: 'end' })
-      if (choice && PRICE_CHOICES.includes(choice as PriceShown)) void api.settings.set('prices', choice)
-    }
-    const label = `${t('prices')} · ${t(active ? `price.${preferences.prices}` : 'prices.all')}`
-    return h('button', { type: 'button', className: `study-icon-btn${active ? ' active' : ''}`, title: label, 'aria-label': label, 'aria-haspopup': 'menu', onClick: pick }, h(Icon, { shapes: CASH }))
+  /** Whose prices the cards show: one icon per group; the active group's again shows every price. */
+  function PriceGroups({ preferences }: { preferences: Preferences }): Node {
+    return h('div', { className: 'poly-groups', role: 'group', 'aria-label': t('prices') },
+      ...(['students', 'internal', 'external'] as PriceGroup[]).map(group => {
+        const active = preferences.prices === group
+        const label = `${t('prices')} · ${t(`price.${group}`)}`
+        return h('button', { key: group, type: 'button', className: `poly-icon-btn${active ? ' active' : ''}`, title: label, 'aria-label': label, 'aria-pressed': active, onClick: () => void api.settings.set('prices', active ? 'all' : group) }, h(Icon, { shapes: GROUP_ICONS[group] }))
+      }))
   }
 
   /** The diet filters, as a header filter menu. */
@@ -372,7 +414,7 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
       const choice = await api.ui.openMenu([
         ...FILTER_KEYS.flatMap(([name], index) => [
           ...(index === 2 ? [{ type: 'separator' as const }] : []),
-          { id: name, type: 'checkbox' as const, label: t(`filter.${name}`), checked: preferences.filters[name] }
+          { id: name, type: 'checkbox' as const, label: t(`filter.${name}`), icon: h(Icon, { shapes: FILTER_ICONS[name] }), checked: preferences.filters[name] }
         ]),
         ...(active ? [{ type: 'separator' as const }, { id: 'clear', label: t('filter.clear') }] : [])
       ], { anchor: event.currentTarget as HTMLElement, align: 'end' })
@@ -382,22 +424,34 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
       if (entry) void api.settings.set(entry[1], !preferences.filters[entry[0]])
     }
     const label = active ? `${t('filter')} · ${FILTER_KEYS.filter(([name]) => preferences.filters[name]).map(([name]) => t(`filter.${name}`)).join(', ')}` : t('filter')
-    return h('button', { type: 'button', className: `study-icon-btn${active ? ' active' : ''}`, title: label, 'aria-label': label, 'aria-haspopup': 'menu', onClick: pick }, h(Icon, { shapes: FILTER }))
+    return h('button', { type: 'button', className: `poly-icon-btn${active ? ' active' : ''}`, title: label, 'aria-label': label, 'aria-haspopup': 'menu', onClick: pick }, h(Icon, { shapes: FILTER }))
   }
 
   const seg = <T extends string>(value: T, current: T, label: string, pick: (value: T) => void) =>
     h('button', { key: value, type: 'button', className: value === current ? 'active' : '', 'aria-pressed': value === current, onClick: () => pick(value) }, label)
-  const Services = ({ preferences }: { preferences: Preferences }): Node => h('div', { className: 'study-seg', role: 'group', 'aria-label': t('service.label') },
+  const Services = ({ preferences }: { preferences: Preferences }): Node => h('div', { className: 'poly-seg', role: 'group', 'aria-label': t('service.label') },
     seg<Service>('lunch', preferences.service, t('service.lunch'), service => setDay({ date: preferences.date, service })),
     seg<Service>('dinner', preferences.service, t('service.dinner'), service => setDay({ date: preferences.date, service })))
-  function DayNav({ preferences }: { preferences: Preferences }): Node {
+  /** The week from Monday to Sunday with its dates; the chevrons move a week, never before this one. */
+  function WeekNav({ preferences }: { preferences: Preferences }): Node {
     const { date, service, locale } = preferences
-    const isToday = date === today()
-    const label = `${formatDay(date, locale, { weekday: 'short' })} ${formatDay(date, locale, { day: 'numeric', month: 'short' })}`
-    return h('div', { className: 'study-day' },
-      h('button', { type: 'button', className: 'study-icon-btn', title: t('day.previous'), 'aria-label': t('day.previous'), onClick: () => setDay({ date: addDays(date, -1), service }) }, h(Icon, { shapes: LEFT })),
-      h('button', { type: 'button', className: `study-day-label${isToday ? ' today' : ''}`, title: `${dayTitle(date, locale)} · ${isToday ? t('day.today') : t('day.backToToday')}`, 'aria-current': isToday ? 'date' : undefined, onClick: () => setDay({ date: today(), service }) }, label),
-      h('button', { type: 'button', className: 'study-icon-btn', title: t('day.next'), 'aria-label': t('day.next'), onClick: () => setDay({ date: addDays(date, 1), service }) }, h(Icon, { shapes: RIGHT })))
+    const now = today()
+    const monday = mondayOf(date)
+    const first = monday <= mondayOf(now)
+    return h('div', { className: 'poly-day' },
+      h('button', { type: 'button', className: 'poly-icon-btn', title: t('week.previous'), 'aria-label': t('week.previous'), disabled: first, onClick: () => { const back = addDays(date, -7); setDay({ date: back < now ? now : back, service }) } }, h(Icon, { shapes: LEFT })),
+      h('div', { className: 'poly-week-days', role: 'group', 'aria-label': t('week.label') },
+        ...Array.from({ length: 7 }, (_, index) => {
+          const day = addDays(monday, index)
+          const isToday = day === now
+          return h('button', {
+            key: day, type: 'button', className: `poly-week-day${isToday ? ' today' : ''}${day === date ? ' selected' : ''}`,
+            title: isToday ? `${dayTitle(day, locale)} · ${t('day.today')}` : dayTitle(day, locale),
+            'aria-label': dayTitle(day, locale), 'aria-pressed': day === date, 'aria-current': isToday ? 'date' : undefined,
+            onClick: () => setDay({ date: day, service })
+          }, h('span', { className: 'poly-week-name' }, formatDay(day, locale, { weekday: 'short' })), h('span', { className: 'poly-week-date' }, formatDay(day, locale, { day: 'numeric' })))
+        })),
+      h('button', { type: 'button', className: 'poly-icon-btn', title: t('week.next'), 'aria-label': t('week.next'), onClick: () => setDay({ date: addDays(date, 7), service }) }, h(Icon, { shapes: RIGHT })))
   }
 
   function useRefresh() {
@@ -437,18 +491,18 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
   }
 
   function Tiles({ places, visible, active }: { places: Places; visible: Tag[]; active: Tag }): Node {
-    return h('nav', { className: 'study-bar study-tiles', 'aria-label': t('campus.label') }, visible.map(campus => {
+    return h('nav', { className: 'poly-bar poly-tiles', 'aria-label': t('campus.label') }, visible.map(campus => {
       const count = places.byTag[campus].filter(location => places.count(location) > 0).length
       const label = t(`campus.${campus}`)
       return h('button', {
-        key: campus, type: 'button', className: `study-tile${campus === active ? ' active' : ''}`, 'aria-pressed': campus === active,
+        key: campus, type: 'button', className: `poly-tile${campus === active ? ' active' : ''}`, 'aria-pressed': campus === active,
         title: t(`campus.${campus}.title`), 'aria-label': `${t(`campus.${campus}.title`)} ${count}`,
-        style: { '--study-tile-color': paletteCssValue(TAG_COLORS[campus]), '--study-tile-on': paletteCssContrast(TAG_COLORS[campus]) } as Record<string, string>,
+        style: { '--poly-tile-color': paletteCssValue(TAG_COLORS[campus]), '--poly-tile-on': paletteCssContrast(TAG_COLORS[campus]) } as Record<string, string>,
         onClick: () => void api.settings.set('campus', campus)
       },
-      h('span', { className: 'study-tile-icon' }, h(Icon, { shapes: TAG_ICONS[campus] })),
+      h('span', { className: 'poly-tile-icon' }, h(Icon, { shapes: TAG_ICONS[campus] })),
       h('span', null, label),
-      h('span', { className: 'study-tile-count' }, places.pending[campus] && !count ? '…' : String(count)))
+      h('span', { className: 'poly-tile-count' }, places.pending[campus] && !count ? '…' : String(count)))
     }))
   }
 
@@ -467,21 +521,21 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
   function Star({ location, preferences }: { location: Location; preferences: Preferences }): Node {
     const on = preferences.favorites.includes(location.id)
     const label = fill(t(on ? 'favorite.remove' : 'favorite.add'), { name: location.name })
-    return h('button', { type: 'button', className: `study-star${on ? ' on' : ''}`, 'aria-pressed': on, title: label, 'aria-label': label, onClick: () => toggleFavorite(preferences, location.id) }, h(Icon, { shapes: STAR }))
+    return h('button', { type: 'button', className: `poly-star${on ? ' on' : ''}`, 'aria-pressed': on, title: label, 'aria-label': label, onClick: () => toggleFavorite(preferences, location.id) }, h(Icon, { shapes: STAR }))
   }
 
   function PlaceRow({ location, preferences, count, active, tag, refresh }: { location: Location; preferences: Preferences; count: number; active: boolean; tag: Tag; refresh: () => void }): Node {
     const opening = h(OpeningLabel, { location, date: preferences.date, service: preferences.service })
     const place = [tag === 'favorites' && location.source === 'eth' ? t(`campus.${location.campus}`) : '', where(location)].filter(Boolean).join(' · ')
-    return h('div', { className: 'study-place-item' }, h('button', {
-      type: 'button', className: `study-place${active ? ' active' : ''}`, 'data-place': location.id, 'aria-current': active ? 'page' : undefined,
+    return h('div', { className: 'poly-place-item' }, h('button', {
+      type: 'button', className: `poly-place${active ? ' active' : ''}`, 'data-place': location.id, 'aria-current': active ? 'page' : undefined,
       onClick: (event: MouseEvent) => openPlace(location, api.ui.hasModKey(event)),
       onAuxClick: (event: MouseEvent) => { if (event.button === 1) { event.preventDefault(); openPlace(location, true) } },
       onContextMenu: (event: MouseEvent) => void placeMenu(event, location, refresh)
     },
-    h('span', { className: 'study-place-name' }, location.name),
-    h('span', { className: 'study-place-count' }, menusLabel(count)),
-    h('span', { className: 'study-place-meta' }, place, place && openingOf(location, preferences.date, preferences.service) ? ' · ' : null, opening)),
+    h('span', { className: 'poly-place-name' }, location.name),
+    h('span', { className: 'poly-place-count' }, menusLabel(count)),
+    h('span', { className: 'poly-place-meta' }, place, place && openingOf(location, preferences.date, preferences.service) ? ' · ' : null, opening)),
     h(Star, { location, preferences }))
   }
 
@@ -495,54 +549,89 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
 
   function PlaceList({ places, campus, preferences, refresh }: { places: Places; campus: Tag; preferences: Preferences; refresh: () => void }): Node {
     const open = useActiveInstance()
-    if (places.error[campus]) return h('div', { className: 'study-note error', role: 'alert' }, places.error[campus])
+    if (places.error[campus]) return h('div', { className: 'poly-note error', role: 'alert' }, places.error[campus])
     const listed = places.byTag[campus].filter(location => places.count(location) > 0)
     const rows = listed.map(location => h(PlaceRow, { key: location.id, location, preferences, count: places.count(location), active: open === placeInstance(location.id), tag: campus, refresh }))
     const note = listNote(places, campus, listed, preferences)
-    return h(React.Fragment, null, ...rows, note ? h('div', { className: 'study-note' }, note) : null)
+    return h(React.Fragment, null, ...rows, note ? h('div', { className: 'poly-note' }, note) : null)
+  }
+
+  const modeTitle = (mode: Mode) => t(mode === 'elink' ? 'elink.title' : mode === 'campus' ? 'campusMap.title' : 'menu.title')
+  const elink = createElinkViews(api, t)
+
+  /** Row 2: the feature tabs, like Map's sidebar tab row (arrow keys, Home and End move between them). */
+  function Tabs({ preferences }: { preferences: Preferences }): Node {
+    return h('div', { className: 'poly-tabs', role: 'tablist', 'aria-label': t('mode.label') },
+      MODES.map((mode, index) => h('button', {
+        key: mode, type: 'button', role: 'tab', className: `poly-tab ${mode === preferences.mode ? 'active' : ''}`, 'aria-selected': mode === preferences.mode,
+        tabIndex: mode === preferences.mode ? 0 : -1, title: modeTitle(mode), 'aria-label': modeTitle(mode), 'data-mode': mode,
+        onClick: () => void api.settings.set('mode', mode),
+        onKeyDown: (event: KeyboardEvent) => {
+          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
+          event.preventDefault()
+          const next = event.key === 'Home' ? 0 : event.key === 'End' ? MODES.length - 1 : (index + (event.key === 'ArrowLeft' ? -1 : 1) + MODES.length) % MODES.length
+          void api.settings.set('mode', MODES[next])
+          ;((event.currentTarget as HTMLElement).parentElement?.children[next] as HTMLElement | undefined)?.focus()
+        }
+      }, h(Icon, { shapes: MODE_ICONS[mode] }))))
+  }
+
+  /** Row 1: the shown feature's name and the page button, which opens that feature's page. */
+  function PanelHeader({ preferences }: { preferences: Preferences }): Node {
+    const mode = preferences.mode
+    const open = (newTab: boolean) => mode === 'elink' ? elink.openElink(newTab) : mode === 'campus' ? openCampus(t('campusMap.title'), newTab) : api.workspace.openMainTab({ newTab })
+    const label = t(mode === 'elink' ? 'elink.openPage' : mode === 'campus' ? 'campusMap.openPage' : 'openPage')
+    return h('div', { className: 'panel-header' },
+      h('span', { className: 'panel-title' }, modeTitle(preferences.mode)),
+      h('div', { className: 'poly-actions' },
+        h('button', {
+          type: 'button', className: 'plugin-open-page', title: label, 'aria-label': label,
+          onClick: (event: MouseEvent) => open(api.ui.hasModKey(event)),
+          onAuxClick: (event: MouseEvent) => { if (event.button === 1) { event.preventDefault(); open(true) } }
+        })))
+  }
+
+  function MenuPanel({ preferences }: { preferences: Preferences }): Node {
+    const { revision, refresh } = useRefresh()
+    const places = usePlaces(preferences, revision)
+    const { visible, active } = campusTags(places, preferences.campus)
+    return h(React.Fragment, null,
+      h(Tiles, { places, visible, active }),
+      h('div', { className: 'poly-bar poly-week' }, h(WeekNav, { preferences })),
+      h('div', { className: 'poly-bar' }, h(Services, { preferences }), h('div', { className: 'poly-spacer' }), h(PriceGroups, { preferences }), h('div', { className: 'poly-divider', 'aria-hidden': true }), h(FilterButton, { preferences })),
+      h('div', { className: 'poly-list' },
+        h(PlaceList, { places, campus: active, preferences, refresh }),
+        h('div', { className: 'poly-credit' }, t(active === 'uzh' ? 'credit.uzh' : active === 'favorites' ? 'credit.both' : 'credit.eth'))))
   }
 
   function Panel(): Node {
     const preferences = usePreferences()
-    const { revision, refresh } = useRefresh()
-    const places = usePlaces(preferences, revision)
-    const { visible, active } = campusTags(places, preferences.campus)
-    const openOverview = (newTab: boolean) => api.workspace.openMainTab({ newTab })
-    return h('div', { className: 'study-panel' },
-      h('div', { className: 'panel-header' },
-        h('span', { className: 'panel-title' }, t('menu.title')),
-        h('div', { className: 'study-actions' },
-          h(Services, { preferences }),
-          h('button', {
-            type: 'button', className: 'plugin-open-page', title: t('openPage'), 'aria-label': t('openPage'),
-            onClick: (event: MouseEvent) => openOverview(api.ui.hasModKey(event)),
-            onAuxClick: (event: MouseEvent) => { if (event.button === 1) { event.preventDefault(); openOverview(true) } }
-          }))),
-      h(Tiles, { places, visible, active }),
-      h('div', { className: 'study-bar' }, h(DayNav, { preferences }), h(PriceButton, { preferences }), h(FilterButton, { preferences })),
-      h('div', { className: 'study-list' },
-        h(PlaceList, { places, campus: active, preferences, refresh }),
-        h('div', { className: 'study-credit' }, t(active === 'uzh' ? 'credit.uzh' : active === 'favorites' ? 'credit.both' : 'credit.eth'))))
+    // 2.0.0 saved the 3D tab as `city`; it is the campus map now.
+    React.useEffect(() => { if (api.settings.get().mode === 'city') void api.settings.set('mode', 'campus') }, [])
+    return h('div', { className: 'poly-panel' },
+      h(PanelHeader, { preferences }),
+      h(Tabs, { preferences }),
+      preferences.mode === 'elink' ? h(elink.ElinkPanelBody, null) : preferences.mode === 'campus' ? h(CampusPanelBody, null) : h(MenuPanel, { preferences }))
   }
 
   function Cards({ location, preferences, revision }: { location: Location; preferences: Preferences; revision: number }): Node {
     const dishes = dishesOf(location, preferences.date, preferences.service, preferences.filters)
-    if (!dishes.length) return h('div', { className: 'study-note' }, menuOf(location, preferences.date, preferences.service) ? t('empty.filtered') : t('empty.location'))
-    return h('div', { className: 'study-cards' }, dishes.map(dish => h(DishCard, { key: dish.id, dish, shown: preferences.prices, revision })))
+    if (!dishes.length) return h('div', { className: 'poly-note' }, menuOf(location, preferences.date, preferences.service) ? t('empty.filtered') : t('empty.location'))
+    return h('div', { className: 'poly-cards' }, dishes.map(dish => h(DishCard, { key: dish.id, dish, shown: preferences.prices, revision })))
   }
 
   function PlaceFacts({ location, preferences }: { location: Location; preferences: Preferences }): Node {
     const menu = menuOf(location, preferences.date, preferences.service)
     const count = dishesOf(location, preferences.date, preferences.service, preferences.filters).length
-    return h('div', { className: 'study-facts-inner' },
-      where(location) ? h('span', { className: 'study-facts-where', title: where(location) }, where(location)) : null,
+    return h('div', { className: 'poly-facts-inner' },
+      where(location) ? h('span', { className: 'poly-facts-where', title: where(location) }, where(location)) : null,
       h(OpeningLabel, { location, date: preferences.date, service: preferences.service }),
       menu?.from && menu.to ? h('span', null, fill(t(`service.time.${preferences.service}`), { hours: `${menu.from}–${menu.to}` })) : null,
       menu ? h('span', null, menusLabel(count)) : null)
   }
 
   /** The page's scrolling body below its fixed bars. */
-  const scroll = (...children: (Node | null)[]): Node => h('div', { className: 'study-list' }, h('div', { className: 'study-page-inner' }, ...children))
+  const scroll = (...children: (Node | null)[]): Node => h('div', { className: 'poly-list' }, h('div', { className: 'poly-page-inner' }, ...children))
 
   /** One place's page: a fixed bar with its location and hours, then its menus as cards; its name stands in the page's first bar. */
   function PlaceBody({ place, preferences, revision, onTitle, onLocation }: { place: NonNullable<ReturnType<typeof placeOf>>; preferences: Preferences; revision: number; onTitle: (title: string) => void; onLocation: (location: Location | null) => void }): Node {
@@ -553,12 +642,12 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     const state = place.source === 'eth' ? eth : uzh
     const location = place.source === 'eth' ? eth.data?.find(row => row.id === place.id) ?? null : uzh.data
     React.useEffect(() => { if (location) onTitle(location.name); onLocation(location) }, [location])
-    const facts = h('div', { className: 'study-bar study-facts' }, location ? h(PlaceFacts, { location, preferences }) : null)
-    if (state.error) return h(React.Fragment, null, facts, scroll(h('div', { className: 'study-note error', role: 'alert' }, state.error)))
-    if (!location) return h(React.Fragment, null, facts, scroll(h('div', { className: 'study-note' }, state.loading ? t('loading') : t('error.notFound'))))
+    const facts = h('div', { className: 'poly-bar poly-facts' }, location ? h(PlaceFacts, { location, preferences }) : null)
+    if (state.error) return h(React.Fragment, null, facts, scroll(h('div', { className: 'poly-note error', role: 'alert' }, state.error)))
+    if (!location) return h(React.Fragment, null, facts, scroll(h('div', { className: 'poly-note' }, state.loading ? t('loading') : t('error.notFound'))))
     return h(React.Fragment, null, facts, scroll(
       h(Cards, { location, preferences, revision }),
-      h('div', { className: 'study-credit' }, t(location.source === 'uzh' ? 'credit.uzh' : 'credit.eth'))))
+      h('div', { className: 'poly-credit' }, t(location.source === 'uzh' ? 'credit.uzh' : 'credit.eth'))))
   }
 
   /** Without a place: every place of the chosen campus, each heading opening its own page. */
@@ -567,37 +656,39 @@ export function registerStudyViews(api: ValleyPluginApi, { t }: { t: (key: strin
     const { active } = campusTags(places, preferences.campus)
     const heading = t(`campus.${active}.title`)
     React.useEffect(() => { onTitle(heading) }, [heading])
-    if (places.error[active]) return scroll(h('div', { className: 'study-note error', role: 'alert' }, places.error[active]))
+    if (places.error[active]) return scroll(h('div', { className: 'poly-note error', role: 'alert' }, places.error[active]))
     const listed = places.byTag[active].filter(location => places.count(location) > 0)
     return scroll(
-      ...listed.map(location => h('section', { key: location.id, className: 'study-section', 'data-place': location.id },
+      ...listed.map(location => h('section', { key: location.id, className: 'poly-section', 'data-place': location.id },
         h('button', {
-          type: 'button', className: 'study-place-link',
+          type: 'button', className: 'poly-place-link',
           onClick: (event: MouseEvent) => openPlace(location, api.ui.hasModKey(event)),
           onAuxClick: (event: MouseEvent) => { if (event.button === 1) { event.preventDefault(); openPlace(location, true) } },
           onContextMenu: (event: MouseEvent) => void placeMenu(event, location, refresh)
-        }, h('span', { className: 'study-place-link-name' }, location.name), h('span', { className: 'study-place-link-meta' }, where(location))),
+        }, h('span', { className: 'poly-place-link-name' }, location.name), h('span', { className: 'poly-place-link-meta' }, where(location))),
         h(Cards, { location, preferences, revision }))),
-      listNote(places, active, listed, preferences) ? h('div', { className: 'study-note' }, listNote(places, active, listed, preferences)) : null,
-      h('div', { className: 'study-credit' }, t(active === 'uzh' ? 'credit.uzh' : active === 'favorites' ? 'credit.both' : 'credit.eth')))
+      listNote(places, active, listed, preferences) ? h('div', { className: 'poly-note' }, listNote(places, active, listed, preferences)) : null,
+      h('div', { className: 'poly-credit' }, t(active === 'uzh' ? 'credit.uzh' : active === 'favorites' ? 'credit.both' : 'credit.eth')))
   }
 
-  function Page({ instanceId }: { instanceId?: string }): Node {
+  function MenuPage({ instanceId }: { instanceId?: string }): Node {
     const preferences = usePreferences()
     const { revision, refreshing, refresh } = useRefresh()
     const place = placeOf(instanceId)
     const [title, setTitle] = React.useState('')
     const [location, setLocation] = React.useState<Location | null>(null)
     React.useEffect(() => { api.workspace.setMainTabTitle(place ? title || t('menu.title') : t('menu.title'), instanceId) }, [instanceId, title, api.ui.language()])
-    return h('div', { className: 'study-page' },
-      h('div', { className: 'study-bar study-page-head' },
-        h('span', { className: `study-bar-balance${place ? ' double' : ''}`, 'aria-hidden': true }),
-        h('h1', { className: 'study-page-title' }, title),
-        place && location ? h(Star, { location, preferences }) : place ? h('span', { className: 'study-bar-balance', 'aria-hidden': true }) : null,
-        h('button', { type: 'button', className: `study-icon-btn${refreshing ? ' spinning' : ''}`, title: t('refresh'), 'aria-label': t('refresh'), onClick: refresh }, h(Icon, { shapes: REFRESH }))),
+    return h('div', { className: 'poly-page' },
+      h('div', { className: 'poly-bar poly-page-head' },
+        h('span', { className: `poly-bar-balance${place ? ' double' : ''}`, 'aria-hidden': true }),
+        h('h1', { className: 'poly-page-title' }, title),
+        place && location ? h(Star, { location, preferences }) : place ? h('span', { className: 'poly-bar-balance', 'aria-hidden': true }) : null,
+        h('button', { type: 'button', className: `poly-icon-btn${refreshing ? ' spinning' : ''}`, title: t('refresh'), 'aria-label': t('refresh'), onClick: refresh }, h(Icon, { shapes: REFRESH }))),
       place ? h(PlaceBody, { place, preferences, revision, onTitle: setTitle, onLocation: setLocation }) : h(OverviewBody, { preferences, revision, refresh, onTitle: setTitle }))
   }
 
-  api.registerView('study.panel', Panel)
-  api.registerView('study.page', Page)
+  api.registerView('poly.panel', Panel)
+  /** The page: the eLink timetable for instance `elink`, the campus map for a `campus` (or 2.0.0's `city`) instance, else the menu plan. */
+  const Page = (props: { instanceId?: string }): Node => isElinkInstance(props.instanceId) ? h(elink.ElinkPage, props) : isCampusInstance(props.instanceId) ? h(CampusPage, null) : h(MenuPage, props)
+  api.registerView('poly.page', Page)
 }

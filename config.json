@@ -3,11 +3,16 @@
   "main": "runtime/index.js",
   "runtime": {
     "ui": "runtime/index.js",
-    "backend": "runtime/backend.js"
+    "backend": "runtime/backend.js",
+    "largeDataOperations": [
+      "model.read",
+      "campus.tile"
+    ]
   },
+  "assets": "runtime/assets",
   "uiSlots": {
-    "left_sidebar": "study.panel",
-    "main_workspace": "study.page"
+    "left_sidebar": "poly.panel",
+    "main_workspace": "poly.page"
   },
   "slotDefaults": {
     "left_sidebar": {
@@ -146,6 +151,149 @@
             "maxLength": 200
           }
         }
+      },
+      {
+        "key": "mode",
+        "label": "Sidebar tab",
+        "labelKey": "settings.mode.title",
+        "type": "custom",
+        "settingsVisible": false,
+        "default": "menu",
+        "description": "The sidebar tab shown: the eLink shuttle, the menu plan or the campus map (2.0.0 saved the campus map's 3D predecessor as city, read as the campus map).",
+        "descriptionKey": "settings.mode.description",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "elink",
+            "menu",
+            "campus",
+            "city"
+          ]
+        }
+      },
+      {
+        "key": "elinkDate",
+        "label": "eLink day",
+        "labelKey": "elink.settings.date.title",
+        "type": "custom",
+        "settingsVisible": false,
+        "default": "",
+        "description": "The day the eLink tab shows; a past day falls back to today.",
+        "descriptionKey": "elink.settings.date.description",
+        "schema": {
+          "type": "string",
+          "maxLength": 10
+        }
+      },
+      {
+        "key": "building",
+        "label": "Building",
+        "labelKey": "settings.building.title",
+        "type": "custom",
+        "settingsVisible": false,
+        "default": "",
+        "description": "The ETH building selected on the campus map, by its code.",
+        "descriptionKey": "settings.building.description",
+        "schema": {
+          "type": "string",
+          "maxLength": 8
+        }
+      },
+      {
+        "key": "level",
+        "label": "Floor",
+        "labelKey": "settings.level.title",
+        "type": "custom",
+        "settingsVisible": false,
+        "default": "",
+        "description": "The floor of the selected building whose rooms the campus map shows.",
+        "descriptionKey": "settings.level.description",
+        "schema": {
+          "type": "string",
+          "maxLength": 24
+        }
+      },
+      {
+        "key": "campusView",
+        "label": "Campus view",
+        "labelKey": "settings.campusView.title",
+        "type": "custom",
+        "settingsVisible": false,
+        "default": "map",
+        "description": "What the campus page shows: the 2D campus map or the 3D city model.",
+        "descriptionKey": "settings.campusView.description",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "map",
+            "3d"
+          ]
+        }
+      },
+      {
+        "key": "colorMode",
+        "label": "Colour",
+        "labelKey": "city.settings.colorMode",
+        "type": "custom",
+        "default": "surfaces",
+        "settingsVisible": false,
+        "schema": {
+          "type": "string",
+          "enum": [
+            "surfaces",
+            "height"
+          ]
+        }
+      },
+      {
+        "key": "showGround",
+        "label": "Ground",
+        "labelKey": "city.settings.showGround",
+        "type": "boolean",
+        "default": true,
+        "settingsVisible": false
+      },
+      {
+        "key": "camera",
+        "label": "Camera",
+        "labelKey": "city.settings.camera",
+        "type": "custom",
+        "settingsVisible": false,
+        "readOnly": true,
+        "schema": {
+          "type": "union",
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "properties": {
+                "position": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3
+                },
+                "target": {
+                  "type": "array",
+                  "items": {
+                    "type": "number"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3
+                }
+              },
+              "required": [
+                "position",
+                "target"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        }
       }
     ]
   },
@@ -154,9 +302,22 @@
       "hosts": [
         "idapps.ethz.ch",
         "app.food2050.ch",
-        "storage.googleapis.com"
+        "storage.googleapis.com",
+        "arcgis-prd-web.ethz.ch",
+        "server.arcgisonline.com",
+        "transport.opendata.ch"
       ]
-    }
+    },
+    "storage": {
+      "metadata": [
+        "plugins/data/poly/model",
+        "plugins/packages/local/poly/runtime/model",
+        "plugins/packages/github/poly/runtime/model",
+        "plugins/packages/community/poly/runtime/model",
+        "plugins/packages/core/poly/runtime/model"
+      ]
+    },
+    "largeData": true
   },
   "locales": {
     "en": "runtime/locales/en.json",
@@ -164,5 +325,17 @@
     "es": "runtime/locales/es.json",
     "fr": "runtime/locales/fr.json",
     "zh-CN": "runtime/locales/zh-CN.json"
-  }
+  },
+  "provides": [
+    {
+      "id": "workspace.details",
+      "kind": "extension",
+      "version": "1.0.0"
+    },
+    {
+      "id": "metadataPanel.segment",
+      "kind": "extension",
+      "version": "1.0.0"
+    }
+  ]
 }

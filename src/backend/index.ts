@@ -4,6 +4,9 @@ import {
   isDishUrl, isImageUrl, parseUzhAllergenNames, parseUzhDish, parseUzhOutlet, parseUzhOutlets, parseUzhWeek, isoWeek, addDays, uzhLocation, uzhUrl, weekday,
   type DishDetail, type EthFacility, type Location, type Outlet, type Service, type Dish, type UzhOutletPage
 } from '../model'
+import { registerCity } from './city'
+import { registerCampus } from './campus'
+import { registerElink } from './elink'
 
 const MENU_TTL = 30 * 60_000
 const LIST_TTL = 12 * 3_600_000
@@ -53,7 +56,7 @@ export function register(api: PluginBackendApi): () => Promise<void> {
       return result
     } catch (error) {
       if (error instanceof Error && ['unavailable', 'notFound', 'serviceError'].includes(error.message)) throw error
-      console.warn(`[study] ${new URL(url).host}: ${error instanceof Error ? error.message : String(error)}`)
+      console.warn(`[poly] ${new URL(url).host}: ${error instanceof Error ? error.message : String(error)}`)
       throw new Error('networkError')
     } finally { requests.delete(requestId); release() }
   }
@@ -172,11 +175,16 @@ export function register(api: PluginBackendApi): () => Promise<void> {
     api.rpc.handle('uzh.outlets', outlets),
     api.rpc.handle('uzh.week', uzhWeek),
     api.rpc.handle('uzh.dish', uzhDish),
-    api.rpc.handle('image', image)
+    api.rpc.handle('image', image),
+    registerCity(api)
   ]
+  const disposeCampus = registerCampus(api)
+  const disposeElink = registerElink(api)
   return async () => {
     disposed = true
     for (const off of offs) off()
+    await disposeCampus()
+    await disposeElink()
     await Promise.all([...requests].map(id => api.network.cancel(id).catch(() => false)))
     memo.clear()
     images.clear()

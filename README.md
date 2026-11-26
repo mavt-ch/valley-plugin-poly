@@ -1,29 +1,73 @@
-# Study
+# Poly
 
-Study tools for ETH and UZH students in Valley. Version 1.4.0 has one feature: a **Menu plan**.
+ETH and UZH in Valley, in one Icon Rail entry (the Polybahn icon). Version 2.3.1 has three features, laid out like the Map plugin: the sidebar's first row names the shown feature and holds the page button, which opens that feature's page; the second row holds one icon tab per feature, **eLink** (bus), **Menu plan** (fork and knife) and **Campus map** (location pin).
+
+## eLink
+
+The ETH eLink shuttle (bus line E of VBG) between ETH Zentrum and ETH Hönggerberg, Monday to Friday.
+
+- **Left sidebar** (the bus tab, first): the day (arrows move a day, a click on the date comes back to today, a past day is never shown) and Refresh, then every direction that runs that day: **Zentrum → Hönggerberg** (from ETH/Universitätsspital), **Hönggerberg → Zentrum**, and on days that have them the morning runs **HB → Hönggerberg** (from Bahnhofplatz/HB) and the evening runs **Hönggerberg → HB** (to Bahnhofplatz/HB or Bahnhofquai/HB). Each direction shows its first and last run of the day and its next five departures as departure-board rows (25 Nov, on request: no boxes): the line badge **E**, the destination, the departure time and, today, the minutes until it leaves ("6'") while that is under an hour; a row's tooltip lists every stop with its time. On another day the first five departures, without minutes. A delay ("+3") shows only when transport.opendata.ch reports it. After the last run: *No more departures today.* with *Show timetable*; on Saturday and Sunday *No eLink on weekends.* (a weekday without runs, such as a holiday: *No eLink runs on this day.*), each with a button for the next weekday.
+- **Page** (instance `elink`, the page button or *Show timetable*): every departure of the chosen day per direction in the same rows, with the arrival at the last stop, the directions side by side; today the next departure is marked and the past ones are dimmed.
+- Data: transport.opendata.ch's public stationboards (no key) of ETH/Universitätsspital, ETH Hönggerberg and Bahnhofplatz/HB for the whole day, buses only, filtered to line E of VBG (it also lists an unrelated VBZ line E at Universitätsspital, which is left out). Pages of at most 420 departures (Hönggerberg needs two a day, so four requests per day), two at a time, kept for two minutes today (live delays) and 30 minutes for other days. "Timetable data by transport.opendata.ch".
 
 ## Menu plan
 
-- **Left sidebar** (the fork-and-knife entry in the Icon Rail), three rows:
-  1. *Menu plan* with Lunch | Dinner and the page button (corners icon).
+- **Left sidebar**, three rows:
+  1. *Menu plan* and the page button (corners icon); below it the feature tabs.
   2. **Favorites** (once a place is starred) and the campus tags **ETH** (ETH Zentrum), **Höngg** (ETH Hönggerberg) and **UZH** (the UZH outlets), each with the number of places that have a matching menu. A campus tag shows only while its campus has a place serving the meal that day; Favorites lists every starred place of any campus.
-  3. The day: arrows move a day, a click on the date comes back to today; the cash button chooses whose prices the cards show (All prices, Students, Staff, Guests); the funnel opens the filters.
+  3. The day: arrows move a day, a click on the date comes back to today; Lunch | Dinner; the cash button chooses whose prices the cards show (All prices, Students, Staff, Guests); the funnel opens the filters.
 
   Below, one full-width row per place (the place whose page is open is highlighted), each with a star that marks it as a favorite (filled yellow); the place page has the same star in its top bar: its name, how many menus it has for the day and meal (after the filters), its location (building and floor for ETH, campus and street for UZH) and, where the source publishes opening hours (ETH), *Open now* or *Closed* with the hours. A click opens the place's page, ⌘-click or the middle button opens it in a new tab; right-click offers a new tab, the place's website and Refresh.
 - **Page**: a place's page names the place in its top bar (day, meal and filters stay in the sidebar), shows its location, opening and serving hours and menu count in a fixed bar below it, and every menu as one compact card: picture, line, every price on one line from students to guests ("CHF 7.90 / 10.90 / 13.90"; the tooltip names the groups, a shared price such as "All visitors" shows once) or, with a group chosen at the cash button, only that group's price (a shared price when that is what the group pays), description, allergens, then the diet, gluten-free, lactose-free and climate tags. Cards do not open or expand. The page button in the sidebar opens the chosen campus with every place and its cards. In a narrow pane the cards become rows with the picture on the left. The page shares the day, meal, filters and price with the sidebar.
-- **Filters** (the funnel in the sidebar, also Settings → Study): Vegetarian (vegan included) and Vegan, then Gluten-free and Lactose-free. A menu counts as gluten-free only when its source declares its allergens and none is a gluten cereal (ETH "gluten wheat", UZH gluten-containing cereals, wheat, barley, rye, spelt, oats, kamut), lactose-free only when none is milk (ETH "milk, lactose", UZH milk); a menu without declared allergens is never called gluten- or lactose-free.
+- **Filters** (the funnel in the sidebar, also Settings → Poly): Vegetarian (vegan included) and Vegan, then Gluten-free and Lactose-free. A menu counts as gluten-free only when its source declares its allergens and none is a gluten cereal (ETH "gluten wheat", UZH gluten-containing cereals, wheat, barley, rye, spelt, oats, kamut), lactose-free only when none is milk (ETH "milk, lactose", UZH milk); a menu without declared allergens is never called gluten- or lactose-free.
 
 The campuses:
 
 - **ETH** and **Höngg**: ETH's outlets sorted by postcode as ETH's own gastronomy page does: Hönggerberg 8093, 8049 and 8053; Oerlikon (8050) and Basel are not shown; everything else is Zentrum. Opening hours, serving times, prices for students, staff and guests, diet, menu type and allergens.
 - **UZH**: every UZH outlet the ZFV publishes on food2050, read in the background when the menu plan opens (two pages at a time, kept for 30 minutes) so the list and the tag counts are complete. Dishes carry diet, food2050's climate rating and allergens; on the page each card also reads its dish page for the picture and the prices. food2050 publishes no opening hours.
 
+## Campus map
+
+ETH's 225 buildings, their floors and rooms, on a 2D campus map and in the 3D city model of Stadt Zürich.
+
+- **Left sidebar** (the pin tab): a search field for buildings (code, street, postcode or place; "ue" finds "ü") and rooms: a room number such as `HG F7` or `HG F 7.1` (or `F7` while a building is selected; `HG F` lists the floor's rooms) or a room type in one building such as `HG Hörsaal` or `HCI lab`. Found **Rooms** (up to 40, by number, with ETH's room type and use) come first, then every building grouped as **ETH Zentrum**, **ETH Hönggerberg** and **Other sites** (folded at first), each row with its code and address. Enter takes the first room, else the first building. A room opens its building on its floor, framed on the map and hatched in the accent colour with its number written inside ("F 7"), in 2D and on the 3D floor, with its card. A room clicked on the map is marked the same way. The selected building is a plain strip at the bottom of the sidebar (two bar heights): its code, address, campus with how many floors with room plans ETH publishes, and a link to ETH's building page; × clears it. The sidebar's groups are always the same four, in 2D and 3D: **ETH Zentrum**, **ETH Hönggerberg**, **Other sites** and **Zürich** (landmarks such as Zürich HB, Grossmünster or Prime Tower; a click flies the 2D map or the 3D camera there). In 3D the page's round controls add **colour by height** and the **ground** switch, and the right sidebar's Properties has a **3D city** tab with the clicked LoD2 building (EGID, height, roof) and the model facts (date, buildings, triangles, tiles, source).
+- **Page** (instance `campus`, ⌘-click on the page button opens another; 2.0.0's `city` tabs open it too): the top bar only names the selected building and its address. Map's round controls sit at the top right in both views: zoom in, zoom out and a **2D/3D** button that names the view it switches to .
+  - **Map**: a blank grey base map (Esri Light Gray Canvas, Dark Gray Canvas in the dark appearance; streets and buildings without shops or other symbols) with every ETH building outline and its code; the selected building is outlined and filled in the accent colour. Drag to pan, wheel or trackpad to zoom, the round + and − buttons too. A click on a building selects it, a click on empty map clears the selection.
+  - **3D**: selecting a building flies the camera to it and highlights every LoD2 building of the city model that belongs to it: at least half of its footprint lies inside ETH's outline, or it covers at least 30 % of the outline (an ETH building that is part of a larger model building highlights that whole building). A click on a building in 3D selects the ETH building at the clicked spot. A building outside Stadt Zürich (Lindau, Basel …) says it is outside the model.
+  - **Floors**: buildings with published room plans (46, at Zentrum and Hönggerberg) show a floor strip at the left of the page, top floor first. A floor shows its rooms coloured by kind (teaching, lab, office, circulation, toilets, service, other, with a legend); on the map a click on a room shows its number, ETH's room type and its use. In 3D the building turns into a translucent shell and the floor's rooms are drawn as a slab at that floor's height (storey heights from ETH's floor data, above the building's base in the city model, or above the ground where the model has no building for it). A floor below the ground (basements, buildings in a slope) shows through the ground map. Clicking the active floor again hides the rooms.
+- **Footer details:** the clicked LoD2 building, loaded tiles, building count and data date of the 3D model.
+
+### Building data
+
+- The building list (`src/campus/buildings.json`, 53 KB) ships with the package: code, street, postcode, place, canton, ETH page and campus, with the centre of each outline for flying to it in 3D. It is regenerated from ETH's building list (CSV) by `node tooling/buildings.mjs <eth_buildings.csv>`, which trims every field, fixes the source's slips (CLG's link pointed at BHA's page, LUI's street was split by a comma, "Zuerich" and "Zürch") and reads the outline centres from ETH's Facilities service. The campus groups follow ETH's site plans (Zentrum and Hönggerberg code lists in the script).
+- `node tooling/check-3d-match.mjs [--realm <realm folder>]` checks the 3D match of every ETH building against the packaged model (or, with `--realm`, that realm's installed one) and lists those without a model building (`--code HIL,HPV` shows single matches, `--outlines <file>` reads a saved GeoJSON instead of ETH's service).
+- Outlines, floors and rooms are read live by the backend from ETH's public campus-map services on `arcgis-prd-web.ethz.ch` (the ones behind ETH's EduApp campus map): `EGDB_EN/Facilities_EN/FeatureServer/5` (outlines), `EGDB_EN/Levels_EN/FeatureServer/2` (floors) and `EGDB_EN/Units_EN/FeatureServer/1` (rooms, one floor per request), paged by 2000 features and kept in memory for 12 hours. Nothing is stored in the package or the realm.
+- Base-map tiles come from Esri's World Light and Dark Gray Base on `server.arcgisonline.com` (no key; OpenStreetMap data) through the backend (six at a time, the last 400 kept in memory); credited "Map © Esri, HERE, Garmin, © OpenStreetMap contributors". They exist up to zoom 16, so the map enlarges them when you zoom in further. CARTO's blank tiles need a key and OpenStreetMap's standard tiles are full of symbols.
+- The 2D map is MapLibre GL, bundled separately into `runtime/assets/campus-map.js` (`build.mjs`) and loaded into the page's document when the map opens; labels are drawn as small images, so no font server is needed.
+
+### 3D city model
+
+The [3D city model of Stadt Zürich](https://www.stadt-zuerich.ch/de/planen-und-bauen/bauvorschriften-und-planerische-grundlagen/planbezug-datenbezug/3d-stadtmodell.html) (Dachmodell LoD2, about 59 000 buildings) is drawn with three.js: pan with the left mouse button, rotate with the right one, zoom with the wheel or trackpad. A click on a building shows its EGID, height, ground and roof elevation (m a.s.l.) and LV95 position; Escape or × clears it. The camera is saved and restored. The view renders only while something moves. The ground carries the same blank base map as the 2D map (light or dark with the app), draped over the approximate ground: tiles near the camera target, zoom 16 close up down to 13 far out, at most four loading at once; the Ground switch shows or hides it.
+
+The model ships with the plugin in `runtime/model/` (about 21 MB, model data of 17 Nov 2026), so a copy of this repository installs with the 3D view working. `npm run build` carries it over into the new `runtime/`. `tooling/update-model.mjs` downloads the newest `LoD2_CityGML.zip` (about 300 MB, 3.3 GB unzipped) from the city's open data portal when it is newer than the packaged model, converts it and replaces `runtime/model/`; commit the result:
+
+```bash
+npm run update-model
+```
+
+`--zip <file>` uses an already downloaded archive; `--force` converts even when the model is current; the previous model is kept in the download folder as `model.previous-<date>`. `--realm <realm folder>` installs the model into `<realm>/.valley/plugins/data/poly/model/` instead, which that realm then reads in place of the packaged one. The package must stay within the installers' limits (32 MiB download, 2,000 files); `npm run check` estimates it.
+
+The converter (`tooling/convert-citygml.mjs`) streams the CityGML, triangulates every wall, roof and ground polygon with earcut and writes 500 m tiles (`tiles/<x>_<y>.bin.gz`: positions quantized to 5 cm, delta-coded, equal vertices of a building shared, indices varint-coded, gzipped; plus a JSON list of the buildings with EGID, triangle range and bounds) and `index.json`. Coordinates stay in LV95 (EPSG:2056) with LN02 heights. The ground (`ground.bin`) is approximated from the base heights of the buildings on a 50 m grid and drawn only within 500 m of a building; it is not a terrain model. Data: Stadt Zürich, Open Government Data, free of use restrictions.
+
 ## Data sources
 
 - ETH: the Cookpit service behind ETH's gastronomy page, `https://idapps.ethz.ch/cookpit-pub-services/v1/` (`facilities`, `weeklyrotas`), with the client id that page sends. Missing English texts (`novalue`) are filled from the German answer.
 - UZH: the food2050 pages of the ZFV, `https://app.food2050.ch/{de|en}/zfv/universitat-zurich…`. They have no public API; the plugin reads the structured payload each server-rendered page embeds (organisation page → outlets, outlet page → address and meal categories, `…/<category>/menu/weekly?week=&year=` → dishes, a dish's own page → picture and prices). Pictures come from `storage.googleapis.com/dish-images-prod/`.
 
-Network requests run only in the backend, two at a time, to `idapps.ethz.ch`, `app.food2050.ch` and `storage.googleapis.com` (the only declared hosts); the open page's reads and pictures go before the list's background reads. Pictures reach the page as data addresses, read only once a card is on screen.
+- Campus map: ETH's campus-map services on `arcgis-prd-web.ethz.ch` and Esri's blank base map from `server.arcgisonline.com` (see Building data).
+- eLink: `https://transport.opendata.ch/v1/stationboard?id=<id>&limit=420&datetime=<YYYY-MM-DD HH:MM>&transportations[]=bus&fields[]=…` for the stops 8591123 (ETH/Universitätsspital), 8591122 (ETH Hönggerberg) and 8587348 (Bahnhofplatz/HB); the next page starts at the minute the last one ended; a page with the asked fields is about 0.8 MB.
+
+Network requests run only in the backend, to `idapps.ethz.ch`, `app.food2050.ch`, `storage.googleapis.com`, `arcgis-prd-web.ethz.ch`, `server.arcgisonline.com` and `transport.opendata.ch` (the only declared hosts). Menu reads run two at a time; the open page's reads and pictures go before the list's background reads. Pictures reach the page as data addresses, read only once a card is on screen.
 
 ## Build and test
 
@@ -36,4 +80,4 @@ npm run typecheck
 npm run check
 ```
 
-`npm run check` builds `runtime/`. Install by copying `manifest.json`, `config.json`, `icon.svg`, `LICENSE`, `README.md` and `runtime/` into a realm's `.valley/plugins/packages/local/study/`.
+`npm run check` builds `runtime/`. Install by copying `manifest.json`, `config.json`, `icon.svg`, `LICENSE`, `README.md` and `runtime/` into a realm's `.valley/plugins/packages/local/poly/`.

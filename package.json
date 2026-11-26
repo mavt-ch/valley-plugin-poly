@@ -1,6 +1,6 @@
 {
-  "name": "@valley/plugin-study",
-  "version": "1.4.0",
+  "name": "@valley/plugin-poly",
+  "version": "2.6.0",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -14,7 +14,9 @@
     "lint": "valley-plugin lint",
     "test": "valley-plugin test",
     "build": "valley-plugin build",
-    "check": "valley-plugin check"
+    "check": "valley-plugin check",
+    "convert": "node tooling/convert-citygml.mjs",
+    "update-model": "node tooling/update-model.mjs"
   },
   "devDependencies": {
     "@testing-library/dom": "10.4.1",
@@ -23,12 +25,22 @@
     "@types/node": "^24.13.3",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "@types/three": "0.186.0",
     "@valley/plugin-sdk": "file:vendor/valley-plugin-sdk-8.7.2.tgz",
     "@valley/plugin-testkit": "file:vendor/valley-plugin-testkit-8.7.2.tgz",
     "@valley/plugin-tools": "file:vendor/valley-plugin-tools-6.1.0.tgz",
+    "earcut": "3.0.2",
+    "esbuild": "0.28.0",
     "jsdom": "27.4.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "vitest": "2.1.9"
+  },
+  "dependencies": {
+    "maplibre-gl": "5.24.0",
+    "three": "0.186.1"
+  },
+  "valley": {
+    "build": "./build.mjs"
   }
 }

@@ -1,0 +1,62 @@
+import type { PluginBackendApi } from '@valley/plugin-sdk'
+
+export const MODEL_FOLDER = 'plugins/data/poly/model'
+/** The model shipped in the package (`model/`, copied to `runtime/model/` by the build), wherever the realm installed it. */
+export const PACKAGE_MODEL_FOLDERS = ['local', 'github', 'community', 'core'].map(source => `plugins/packages/${source}/poly/runtime/model`)
+export const CHUNK_BYTES = 2 * 1024 * 1024
+const MODEL_FILE = /^(?:index\.json|ground\.bin|tiles\/-?\d{1,6}_-?\d{1,6}\.(?:bin\.gz|json))$/
+
+function request(value: unknown): { path: string; offset: number } {
+  const input = value as { path?: unknown; offset?: unknown } | null
+  if (!input || typeof input.path !== 'string' || !MODEL_FILE.test(input.path)) throw new Error('invalidPath')
+  const offset = input.offset ?? 0
+  if (typeof offset !== 'number' || !Number.isSafeInteger(offset) || offset < 0) throw new Error('invalidOffset')
+  return { path: input.path, offset }
+}
+
+// The host answers `encoding: 'bytes'` with an ArrayBuffer; the vendored SDK types still describe base64 only.
+interface ByteStorage {
+  readBytes(location: { handle: string; path: string }, options: { offset?: number; maxBytes?: number; encoding: 'bytes' }): Promise<{ bytes?: ArrayBuffer; base64?: string; nextOffset: number; done: boolean }>
+}
+
+function toBuffer(chunk: { bytes?: ArrayBuffer; base64?: string }): ArrayBuffer {
+  if (chunk.bytes) return chunk.bytes
+  const binary = atob(chunk.base64 ?? '')
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
+  return bytes.buffer
+}
+
+export function registerCity(api: PluginBackendApi): () => void {
+  const storage = api.storage as unknown as ByteStorage
+  const opened: string[] = []
+  // A model installed into the realm's plugin data (`npm run update-model -- --realm`) wins over the packaged one.
+  const find = async (): Promise<{ handle: string; folder: string } | null> => {
+    for (const folder of [MODEL_FOLDER, ...PACKAGE_MODEL_FOLDERS]) {
+      const { handle } = await api.storage.open({ area: 'metadata', path: folder, kind: 'directory', mode: 'read' })
+      const entry = await api.storage.stat({ handle, path: 'index.json' }).catch(() => null)
+      if (entry?.kind === 'file') { opened.push(handle); return { handle, folder } }
+      await api.storage.close(handle).catch(() => {})
+    }
+    return null
+  }
+  let model: Promise<{ handle: string; folder: string } | null> | null = null
+  const located = () => (model ??= find().then(value => { if (!value) model = null; return value }, error => { model = null; throw error }))
+  const offs = [
+    api.rpc.handle('model.status', async () => {
+      const found = await located()
+      return { installed: !!found, folder: `${found?.folder ?? MODEL_FOLDER}/`, bundled: !!found && found.folder !== MODEL_FOLDER }
+    }),
+    // One chunk of a model file: the bytes reach the UI as an ArrayBuffer (bytes mode), never as base64.
+    api.rpc.handle('model.read', async raw => {
+      const { path, offset } = request(raw)
+      const found = await located()
+      if (!found) throw new Error('modelMissing')
+      return toBuffer(await storage.readBytes({ handle: found.handle, path }, { offset, maxBytes: CHUNK_BYTES, encoding: 'bytes' }))
+    }),
+  ]
+  return () => {
+    offs.forEach(off => off())
+    for (const handle of opened.splice(0)) void api.storage.close(handle).catch(() => {})
+  }
+}
