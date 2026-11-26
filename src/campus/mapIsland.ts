@@ -7,9 +7,11 @@
  */
 import maplibreCss from 'maplibre-gl/dist/maplibre-gl.css'
 import { Map as MlMap, addProtocol, removeProtocol, type GeoJSONSource, type MapMouseEvent, type StyleSpecification } from 'maplibre-gl'
+import { commandAsControl } from './mapGestures'
 import { roomLabel, type Outline, type Polygon, type Room, type RoomKind } from './services'
 
-export interface CampusCamera { center: [number, number]; zoom: number }
+export interface CampusCamera { center: [number, number]; zoom: number; bearing?: number }
+
 
 export interface CampusMapOptions {
   container: HTMLElement
@@ -87,6 +89,14 @@ export class CampusMap {
   private pendingFit: [number, number, number, number] | null = null
   private disposed = false
 
+  private readonly commandDrag = (event: MouseEvent): void => {
+    const press = commandAsControl(event)
+    if (!press || !event.target) return
+    event.stopPropagation()
+    event.preventDefault()
+    event.target.dispatchEvent(press)
+  }
+
   constructor(private readonly options: CampusMapOptions) {
     const document = options.container.ownerDocument
     if (!document.getElementById(STYLE_ID)) {
@@ -107,20 +117,22 @@ export class CampusMap {
       style: this.style(),
       center: options.camera.center,
       zoom: options.camera.zoom,
+      bearing: options.camera.bearing ?? 0,
       maxZoom: 20,
       // The page draws its own zoom buttons and attribution in Valley's style.
       attributionControl: false,
-      dragRotate: false,
+      // The map turns but never tilts: it stays a plan.
+      dragRotate: true,
       pitchWithRotate: false,
     })
-    this.map.touchZoomRotate.disableRotation()
+    options.container.addEventListener('mousedown', this.commandDrag, true)
     this.map.on('styleimagemissing', event => this.drawLabel(event.id))
     this.map.on('load', () => {
       this.ready = true
       this.sync()
       if (this.pendingFit) { const bounds = this.pendingFit; this.pendingFit = null; this.fit(bounds) }
     })
-    this.map.on('moveend', () => { const center = this.map.getCenter(); options.onCamera({ center: [center.lng, center.lat], zoom: this.map.getZoom() }) })
+    this.map.on('moveend', () => { const center = this.map.getCenter(); options.onCamera({ center: [center.lng, center.lat], zoom: this.map.getZoom(), bearing: this.map.getBearing() }) })
     this.map.on('click', event => this.click(event))
     for (const layer of ['buildings-fill', 'rooms-fill']) {
       this.map.on('mouseenter', layer, () => { this.map.getCanvas().style.cursor = 'pointer' })
@@ -269,7 +281,8 @@ export class CampusMap {
   /** Fits [west, south, east, north] into view, waiting for the style when it is still loading. */
   fit(bounds: [number, number, number, number], maxZoom = 18.5): void {
     if (!this.ready) { this.pendingFit = bounds; return }
-    this.map.fitBounds([[bounds[0], bounds[1]], [bounds[2], bounds[3]]], { padding: 60, maxZoom, duration: 700 })
+    // Framing keeps the map turned the way it is.
+    this.map.fitBounds([[bounds[0], bounds[1]], [bounds[2], bounds[3]]], { padding: 60, maxZoom, duration: 700, bearing: this.map.getBearing() })
   }
 
   zoomBy(delta: number): void {
@@ -293,6 +306,7 @@ export class CampusMap {
   dispose(): void {
     if (this.disposed) return
     this.disposed = true
+    this.options.container.removeEventListener('mousedown', this.commandDrag, true)
     this.resize?.disconnect()
     this.map.remove()
     removeProtocol(this.protocol)
