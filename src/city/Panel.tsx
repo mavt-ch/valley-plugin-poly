@@ -21,7 +21,10 @@ export function CityProperties() {
           <dl className="z3d-facts">
             <dt>{uiText('building.egid')}</dt><dd>{city.selected.egid ?? '—'}</dd>
             <dt>{uiText('building.height')}</dt><dd>{formatMetres(city.selected.height)}</dd>
+            <dt>{uiText('building.ground')}</dt><dd>{formatMetres(city.selected.ground)} {uiText('unit.asl')}</dd>
             <dt>{uiText('building.roof')}</dt><dd>{formatMetres(city.selected.roof)} {uiText('unit.asl')}</dd>
+            <dt>{uiText('building.position')}</dt><dd>{formatNumber(city.selected.center[0])} / {formatNumber(city.selected.center[1])}</dd>
+            <dt>{uiText('building.triangles')}</dt><dd>{formatNumber(city.selected.triangles)}</dd>
           </dl>
         </section>
       )}

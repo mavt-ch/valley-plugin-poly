@@ -26,6 +26,11 @@ describe('3D city Properties tab', () => {
     // The facts read the model's status once; let that answer land.
     await act(async () => { for (let i = 0; i < 4; i++) await new Promise(resolve => setTimeout(resolve, 0)) })
     expect(container.querySelector('.z3d-options')).not.toBeNull()
+    // The clicked LoD2 building is shown here, not on the page (26 Nov).
+    const { update } = await import('../src/city/store')
+    act(() => update({ selected: { egid: '3169989', ground: 447.3, roof: 499.7, height: 52.4, triangles: 1234, center: [2683790, 1247870] } }))
+    for (const text of ['3169989', '52.4', '447.3', '499.7', '1,234']) expect(container.textContent).toContain(text)
+    act(() => update({ selected: null }))
     settings.campusView = 'map'
     const second = render(segment!.render({ relPath: '', kind: 'unsupported', tab: { pluginId: 'poly', instanceId: 'campus' } }) as never)
     expect(second.container.textContent).toContain('while the campus page shows 3D')

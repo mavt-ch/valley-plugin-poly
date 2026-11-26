@@ -2,8 +2,6 @@ import { React, api } from './runtime'
 import { uiText } from './localization'
 import { CityScene, type CameraState, type Lv95Polygon, type SceneArea } from './scene'
 import { getState, loadModel, readModelFile, update, useCity } from './store'
-import { formatMetres, formatNumber } from './format'
-import { CloseIcon } from './icons'
 import { MissingModel } from './MissingModel'
 
 let activeScene: CityScene | null = null
@@ -95,7 +93,6 @@ export function CityStage({ area, focus, onPick }: CityStageProps) {
     return () => doc?.removeEventListener('keydown', onKey)
   }, [])
 
-  const selected = city.selected
   return (
     <div className="z3d-stage" ref={stage}>
       {city.status === 'loading' && <div className="z3d-message">{uiText('model.loading')}</div>}
@@ -103,22 +100,6 @@ export function CityStage({ area, focus, onPick }: CityStageProps) {
       {city.status === 'error' && <div className="z3d-message"><strong>{uiText('model.errorTitle')}</strong><span className="z3d-error">{city.error}</span></div>}
       {failure && city.status === 'ready' && city.loadedTiles === 0 && <div className="z3d-message"><strong>{uiText('view.failed')}</strong><span className="z3d-error">{failure}</span></div>}
       {city.status === 'ready' && city.loadingTiles > 0 && <div className="z3d-status" role="status">{uiText('view.loadingTiles', { count: city.loadingTiles })}</div>}
-      {selected && (
-        <div className="z3d-card" role="dialog" aria-label={uiText('building.title')}>
-          <div className="z3d-card-head">
-            <span>{uiText('building.title')}</span>
-            <button type="button" className="z3d-card-close" title={uiText('building.close')} aria-label={uiText('building.close')} onClick={() => scene.current?.clearSelection()}><CloseIcon /></button>
-          </div>
-          <dl className="z3d-facts">
-            <dt>{uiText('building.egid')}</dt><dd>{selected.egid ?? '—'}</dd>
-            <dt>{uiText('building.height')}</dt><dd>{formatMetres(selected.height)}</dd>
-            <dt>{uiText('building.ground')}</dt><dd>{formatMetres(selected.ground)} {uiText('unit.asl')}</dd>
-            <dt>{uiText('building.roof')}</dt><dd>{formatMetres(selected.roof)} {uiText('unit.asl')}</dd>
-            <dt>{uiText('building.position')}</dt><dd>{formatNumber(selected.center[0])} / {formatNumber(selected.center[1])}</dd>
-            <dt>{uiText('building.triangles')}</dt><dd>{formatNumber(selected.triangles)}</dd>
-          </dl>
-        </div>
-      )}
     </div>
   )
 }
