@@ -1,11 +1,14 @@
 import config from '../config.json'
 import type { PluginBackendApi } from '@valley/plugin-sdk'
-import { CHUNK_BYTES, MODEL_FOLDER, PACKAGE_MODEL_FOLDERS, registerCity as register } from '../src/backend/city'
+import { CHUNK_BYTES, MODEL_FOLDER, registerCity as register } from '../src/backend/city'
 
-function backend(installed: readonly string[] = [MODEL_FOLDER]) {
+function backend(installed: readonly string[] = [MODEL_FOLDER], refused: readonly string[] = []) {
   const handlers = new Map<string, (payload: unknown) => unknown>()
   const storage = {
-    open: vi.fn(async ({ path }: { path: string }) => ({ handle: path, path: '/realm/.valley/' + path, kind: 'directory', mode: 'read' })),
+    open: vi.fn(async ({ path }: { path: string }) => {
+      if (refused.includes(path)) throw new Error('Storage paths cannot traverse symbolic links')
+      return { handle: path, path: '/realm/.valley/' + path, kind: 'directory', mode: 'read' }
+    }),
     stat: vi.fn(async ({ handle, path }: { handle: string; path: string }) => (path === 'index.json' && installed.includes(handle) ? { name: 'index.json', kind: 'file', size: 10, mtimeMs: 0 } : null)),
     readBytes: vi.fn(async () => ({ bytes: new Uint8Array([1, 2, 3]).buffer, nextOffset: 3, done: true })),
     close: vi.fn(async () => {}),
@@ -18,29 +21,26 @@ function backend(installed: readonly string[] = [MODEL_FOLDER]) {
 describe('backend', () => {
   it('reports an installed model', async () => {
     const { handlers, storage } = backend()
-    await expect(handlers.get('model.status')?.(undefined)).resolves.toEqual({ installed: true, folder: `${MODEL_FOLDER}/`, bundled: false })
+    await expect(handlers.get('model.status')?.(undefined)).resolves.toEqual({ installed: true, folder: `${MODEL_FOLDER}/` })
     expect(storage.open).toHaveBeenCalledWith({ area: 'metadata', path: MODEL_FOLDER, kind: 'directory', mode: 'read' })
-  })
-
-  it('reads the packaged model when the realm has none', async () => {
-    const github = PACKAGE_MODEL_FOLDERS.find(folder => folder.includes('/github/'))!
-    const { handlers, storage } = backend([github])
-    await expect(handlers.get('model.status')?.(undefined)).resolves.toEqual({ installed: true, folder: `${github}/`, bundled: true })
-    await handlers.get('model.read')?.({ path: 'index.json', offset: 0 })
-    expect(storage.readBytes).toHaveBeenLastCalledWith({ handle: github, path: 'index.json' }, { offset: 0, maxBytes: CHUNK_BYTES, encoding: 'bytes' })
-    expect(storage.close).toHaveBeenCalledWith(MODEL_FOLDER)
-    expect(storage.close).not.toHaveBeenCalledWith(github)
   })
 
   it('reports a missing model and looks again on the next call', async () => {
     const { handlers, storage } = backend([])
-    await expect(handlers.get('model.status')?.(undefined)).resolves.toEqual({ installed: false, folder: `${MODEL_FOLDER}/`, bundled: false })
+    await expect(handlers.get('model.status')?.(undefined)).resolves.toEqual({ installed: false, folder: `${MODEL_FOLDER}/` })
     await expect(handlers.get('model.read')?.({ path: 'index.json' })).rejects.toThrow('modelMissing')
-    expect(storage.open).toHaveBeenCalledTimes((1 + PACKAGE_MODEL_FOLDERS.length) * 2)
+    expect(storage.open).toHaveBeenCalledTimes(2)
+    expect(storage.close).toHaveBeenCalledWith(MODEL_FOLDER)
   })
 
-  it('declares a read grant for every model folder', () => {
-    expect(config.permissions.storage.metadata).toEqual([MODEL_FOLDER, ...PACKAGE_MODEL_FOLDERS])
+  it('treats a folder the host refuses as no installed model', async () => {
+    const { handlers, storage } = backend([MODEL_FOLDER], [MODEL_FOLDER])
+    await expect(handlers.get('model.status')?.(undefined)).resolves.toEqual({ installed: false, folder: `${MODEL_FOLDER}/` })
+    expect(storage.stat).not.toHaveBeenCalled()
+  })
+
+  it('declares a read grant only for the realm-installed model', () => {
+    expect(config.permissions.storage.metadata).toEqual([MODEL_FOLDER])
   })
 
   it('reads model files in chunks as bytes', async () => {

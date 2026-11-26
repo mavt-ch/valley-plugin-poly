@@ -2,6 +2,8 @@ import { api } from './runtime'
 import { campusText } from './localization'
 import { isCampusInstance, openCampus } from '../campus/store'
 import { isTileIndex, type TileIndex } from './tileFormat'
+import { ModelAssetMissing, readPackagedModelFile } from './modelAssets'
+import { uiText } from './localization'
 
 export type ColorMode = 'surfaces' | 'height'
 export type ModelStatus = 'loading' | 'missing' | 'ready' | 'error'
@@ -63,8 +65,11 @@ export function useCity(): CityState {
   return api.React.useSyncExternalStore(subscribe, getState)
 }
 
-/** A whole model file, read in backend chunks until `size` bytes (or an empty chunk) arrived. */
-export async function readModelFile(path: string, size?: number): Promise<ArrayBuffer> {
+/** A model installed in the realm's plugin data is read by the backend; else the package's own model is used. */
+let source: 'realm' | 'package' = 'package'
+
+/** A whole model file of a realm-installed model, read in backend chunks until `size` bytes (or an empty chunk) arrived. */
+async function readRealmModelFile(path: string, size?: number): Promise<ArrayBuffer> {
   const parts: Uint8Array[] = []
   let offset = 0
   for (;;) {
@@ -81,6 +86,20 @@ export async function readModelFile(path: string, size?: number): Promise<ArrayB
   return whole.buffer
 }
 
+/** Host and loader errors stay out of the page: it says in plain words that the model could not be read. */
+function unreadable(error: unknown): Error {
+  console.warn('Poly: the city model could not be read', error)
+  return new Error(uiText('model.errorText'))
+}
+
+export async function readModelFile(path: string, size?: number): Promise<ArrayBuffer> {
+  try {
+    return source === 'realm' ? await readRealmModelFile(path, size) : await readPackagedModelFile(path)
+  } catch (error) {
+    throw unreadable(error)
+  }
+}
+
 let loading: Promise<void> | null = null
 
 export function loadModel(force = false): Promise<void> {
@@ -88,13 +107,21 @@ export function loadModel(force = false): Promise<void> {
   update({ status: 'loading', error: null })
   loading = (async () => {
     try {
-      const status = await api.backend.call<{ installed: boolean; folder: string }>('model.status')
-      if (!status.installed) { update({ status: 'missing', folder: status.folder, index: null }); return }
-      const index: unknown = JSON.parse(new TextDecoder().decode(await readModelFile('index.json')))
+      const status = await api.backend.call<{ installed: boolean; folder: string }>('model.status').catch(() => null)
+      source = status?.installed ? 'realm' : 'package'
+      const folder = status?.installed ? status.folder : 'runtime/assets/model/'
+      let bytes: ArrayBuffer
+      try {
+        bytes = source === 'realm' ? await readRealmModelFile('index.json') : await readPackagedModelFile('index.json')
+      } catch (error) {
+        if (error instanceof ModelAssetMissing) { update({ status: 'missing', folder, index: null }); return }
+        throw error
+      }
+      const index: unknown = JSON.parse(new TextDecoder().decode(bytes))
       if (!isTileIndex(index)) throw new Error('index.json is not a Zürich 3D model index')
-      update({ status: 'ready', index, folder: status.folder })
+      update({ status: 'ready', index, folder })
     } catch (error) {
-      update({ status: 'error', error: error instanceof Error ? error.message : String(error) })
+      update({ status: 'error', error: unreadable(error).message })
     }
   })()
   return loading

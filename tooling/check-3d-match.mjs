@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Runs the 3D view's building match (src/city/match.ts) for every ETH building against the packaged city model
-// (runtime/model) or a realm's installed one and lists the buildings of the model area that match nothing. Outlines are
+// (runtime/assets/model) or a realm's installed one and lists the buildings of the model area that match nothing. Outlines are
 // read from ETH's Facilities service, or from a saved GeoJSON of it.
 // Usage: node tooling/check-3d-match.mjs [--realm <realm folder>] [--outlines <facilities.geojson>] [--code HIL,HG]
 import { existsSync, readFileSync } from 'node:fs'
@@ -11,12 +11,15 @@ import { FACILITIES_URL, PAGE_SIZE, exceeded, parseOutlines, query } from '../sr
 import { wgs84ToLv95 } from '../src/city/geo.ts'
 import { belongsTo, boundsOfLv95, boundsOverlap, footprintOverlap } from '../src/city/match.ts'
 import { decodeTile } from '../src/city/tileFormat.ts'
+import { hasModelAssets, readModelAsset } from './modelAssets.mjs'
 
 const args = process.argv.slice(2)
 const option = (name) => { const at = args.indexOf(name); return at >= 0 ? args[at + 1] : undefined }
 const realm = option('--realm')
-const model = realm ? join(resolve(realm), '.valley', 'plugins', 'data', 'poly', 'model') : fileURLToPath(new URL('../runtime/model', import.meta.url))
-if (!existsSync(join(model, 'index.json'))) { console.error('Usage: node tooling/check-3d-match.mjs [--realm <realm with an installed model>] [--outlines <facilities.geojson>] [--code HIL,HG]'); process.exit(2) }
+const model = realm ? join(resolve(realm), '.valley', 'plugins', 'data', 'poly', 'model') : fileURLToPath(new URL('../runtime/assets/model', import.meta.url))
+// A realm-installed model is plain files; the packaged one is packed into scripts.
+const readModel = realm ? (path) => readFileSync(join(model, path)) : (path) => readModelAsset(model, path)
+if (realm ? !existsSync(join(model, 'index.json')) : !hasModelAssets(model)) { console.error('Usage: node tooling/check-3d-match.mjs [--realm <realm with an installed model>] [--outlines <facilities.geojson>] [--code HIL,HG]'); process.exit(2) }
 
 async function readOutlines() {
   const file = option('--outlines')
@@ -31,7 +34,7 @@ async function readOutlines() {
   }
 }
 
-const index = JSON.parse(readFileSync(join(model, 'index.json'), 'utf8'))
+const index = JSON.parse(readModel('index.json').toString('utf8'))
 const buildings = JSON.parse(readFileSync(new URL('../src/campus/buildings.json', import.meta.url), 'utf8'))
 const outlines = await readOutlines()
 const only = option('--code')?.split(',')
@@ -40,10 +43,10 @@ const tiles = new Map()
 function readTile(key) {
   let tile = tiles.get(key)
   if (!tile) {
-    const packed = gunzipSync(readFileSync(join(model, 'tiles', `${key}.bin.gz`)))
+    const packed = gunzipSync(readModel(`tiles/${key}.bin.gz`))
     const data = decodeTile(packed.buffer.slice(packed.byteOffset, packed.byteOffset + packed.byteLength))
     const point = (vertex) => [data.origin[0] + data.positions[vertex * 3] * data.step[0], data.origin[1] + data.positions[vertex * 3 + 1] * data.step[1]]
-    tile = { buildings: JSON.parse(readFileSync(join(model, 'tiles', `${key}.json`), 'utf8')), triangles: { indices: data.indices, kinds: data.kinds, point } }
+    tile = { buildings: JSON.parse(readModel(`tiles/${key}.json`).toString('utf8')), triangles: { indices: data.indices, kinds: data.kinds, point } }
     tiles.set(key, tile)
   }
   return tile

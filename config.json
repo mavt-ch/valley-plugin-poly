@@ -310,11 +310,7 @@
     },
     "storage": {
       "metadata": [
-        "plugins/data/poly/model",
-        "plugins/packages/local/poly/runtime/model",
-        "plugins/packages/github/poly/runtime/model",
-        "plugins/packages/community/poly/runtime/model",
-        "plugins/packages/core/poly/runtime/model"
+        "plugins/data/poly/model"
       ]
     },
     "largeData": true
