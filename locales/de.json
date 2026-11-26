@@ -89,6 +89,8 @@
   "mode.label": "Seitenleisten-Tabs",
   "settings.mode.title": "Seitenleisten-Tab",
   "settings.mode.description": "Der gezeigte Tab der Seitenleiste: der eLink-Shuttle, der Menüplan oder der Campusplan.",
+  "settings.tabOrder.title": "Reihenfolge der Seitenleisten-Tabs",
+  "settings.tabOrder.description": "Die Reihenfolge der Tabs in der Seitenleiste; ändern durch Ziehen eines Tabs oder mit Wahltaste und Pfeiltaste.",
   "city.display.color": "Farbe",
   "city.display.surfaces": "Flächen",
   "city.display.height": "Höhe",

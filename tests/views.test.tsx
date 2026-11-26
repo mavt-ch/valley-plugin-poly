@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { ComponentType } from 'react'
 import { createMockValleyApi } from '@valley/plugin-testkit'
-import { registerPolyViews } from '../src/views'
+import { moveTab, registerPolyViews, tabOrderOf } from '../src/views'
 import { initRuntime } from '../src/city/runtime'
 import { parseEthFacilities, parseEthWeek, parseUzhOutlet, parseUzhOutlets, parseUzhWeek, ethCampus, uzhLocation, today, mondayOf } from '../src/model'
 import { DISH_IMAGE, ETH_FACILITIES, ETH_ROTAS, ETH_ROTAS_DE, UZH_LUNCH, UZH_ORG, UZH_OUTLET } from './fixtures'
@@ -452,6 +452,36 @@ describe('campus map tab', () => {
     await settle()
     expect(settings.mode).toBe('menu')
     expect(container.querySelector('.poly-tiles')).not.toBeNull()
+  })
+
+  it('reorders the feature tabs by dragging one or with Option and an arrow key, and keeps the order', async () => {
+    const order = (container: HTMLElement) => [...container.querySelectorAll('.poly-tab')].map(tab => tab.getAttribute('data-mode'))
+    const { settings, container } = harness({ tabOrder: ['campus', 'menu'] })
+    await settle()
+    // A saved order is completed with the missing tab; the campus tab carries ETH's main building.
+    expect(order(container)).toEqual(['campus', 'menu', 'elink'])
+    expect(tabOf(container, 'campus').querySelectorAll('path').length).toBeGreaterThan(10)
+    fireEvent.keyDown(tabOf(container, 'campus'), { key: 'ArrowRight', altKey: true })
+    await settle()
+    expect(settings.tabOrder).toEqual(['menu', 'campus', 'elink'])
+    expect(order(container)).toEqual(['menu', 'campus', 'elink'])
+    expect(settings.mode).toBeUndefined()
+    // A drag of two tab widths to the left puts the eLink tab first; the drag is not a click.
+    const tab = tabOf(container, 'elink')
+    tab.getBoundingClientRect = () => ({ x: 0, y: 0, left: 0, top: 0, right: 30, bottom: 26, width: 30, height: 26, toJSON: () => ({}) })
+    fireEvent.pointerDown(tab, { button: 0, clientX: 100, pointerId: 1 })
+    fireEvent.pointerMove(window, { clientX: 70, pointerId: 1 })
+    fireEvent.pointerMove(window, { clientX: 38, pointerId: 1 })
+    expect(order(container)).toEqual(['elink', 'menu', 'campus'])
+    expect(tabOf(container, 'elink').className).toContain('dragging')
+    fireEvent.pointerUp(window, { clientX: 38, pointerId: 1 })
+    fireEvent.click(tabOf(container, 'elink'))
+    await settle()
+    expect(settings.tabOrder).toEqual(['elink', 'menu', 'campus'])
+    expect(settings.mode).toBeUndefined()
+    expect(tabOf(container, 'elink').className).not.toContain('dragging')
+    expect(tabOrderOf(['x', 'menu', 'menu'])).toEqual(['menu', 'elink', 'campus'])
+    expect(moveTab(['elink', 'menu', 'campus'], 'elink', 9)).toEqual(['menu', 'campus', 'elink'])
   })
 
   it('reads 2.0.0\'s city tab as the campus map and saves it under its new name', async () => {

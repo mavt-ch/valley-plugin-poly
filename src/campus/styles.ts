@@ -11,6 +11,8 @@ export const CAMPUS_CSS = `
 .poly-tab svg { width:var(--shell-glyph-medium, 16px); height:var(--shell-glyph-medium, 16px); }
 .poly-tab:hover { background:var(--hover-bg); color:var(--text-color); }
 .poly-tab.active { background:var(--accent-tint-bg); color:var(--title-color); }
+.poly-tab { touch-action:none; }
+.poly-tab.dragging { position:relative; z-index:1; cursor:grabbing; }
 .poly-tab:focus-visible { outline:2px solid var(--accent-color); outline-offset:-2px; }
 
 /* Campus sidebar: the search row (shared .search-field, centred in one 38px row), the selected building, the groups. */

@@ -1,6 +1,6 @@
 # Poly
 
-ETH and UZH in Valley, in one Icon Rail entry (the Polybahn icon). Version 2.3.1 has three features, laid out like the Map plugin: the sidebar's first row names the shown feature and holds the page button, which opens that feature's page; the second row holds one icon tab per feature, **eLink** (bus), **Menu plan** (fork and knife) and **Campus map** (location pin).
+ETH and UZH in Valley, in one Icon Rail entry (the Polybahn icon). Version 2.3.1 has three features, laid out like the Map plugin: the sidebar's first row names the shown feature and holds the page button, which opens that feature's page; the second row holds one icon tab per feature, **eLink** (bus), **Menu plan** (fork and knife) and **Campus map** (ETH's main building), in an order you can change by dragging.
 
 ## eLink
 
@@ -13,7 +13,7 @@ The ETH eLink shuttle (bus line E of VBG) between ETH Zentrum and ETH Hönggerbe
 ## Menu plan
 
 - **Left sidebar**, three rows:
-  1. *Menu plan* and the page button (corners icon); below it the feature tabs.
+  1. *Menu plan* and the page button (corners icon); below it the feature tabs: eLink (a bus), Menu plan (fork and knife) and Campus map (ETH's main building). Drag a tab sideways, or press Option (Alt) and an arrow key on it, to change their order; it is kept.
   2. **Favorites** (once a place is starred) and the campus tags **ETH** (ETH Zentrum), **Höngg** (ETH Hönggerberg) and **UZH** (the UZH outlets), each with the number of places that have a matching menu. A campus tag shows only while its campus has a place serving the meal that day; Favorites lists every starred place of any campus.
   3. The day: arrows move a day, a click on the date comes back to today; Lunch | Dinner; the cash button chooses whose prices the cards show (All prices, Students, Staff, Guests); the funnel opens the filters.
 

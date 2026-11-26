@@ -172,6 +172,32 @@
         }
       },
       {
+        "key": "tabOrder",
+        "label": "Sidebar tab order",
+        "labelKey": "settings.tabOrder.title",
+        "type": "custom",
+        "settingsVisible": false,
+        "default": [
+          "elink",
+          "menu",
+          "campus"
+        ],
+        "description": "The order of the sidebar's feature tabs, changed by dragging a tab or with Option and an arrow key.",
+        "descriptionKey": "settings.tabOrder.description",
+        "schema": {
+          "type": "array",
+          "maxItems": 3,
+          "items": {
+            "type": "string",
+            "enum": [
+              "elink",
+              "menu",
+              "campus"
+            ]
+          }
+        }
+      },
+      {
         "key": "elinkDate",
         "label": "eLink day",
         "labelKey": "elink.settings.date.title",

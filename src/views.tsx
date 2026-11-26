@@ -14,7 +14,7 @@ import {
   CAMPUSES, addDays, defaultService, dishesOf, formatPrice, hasFilters, priceFor, pricesInOrder, isDate, menuOf, mondayOf, openState, openingOf, placeInstance, placeOf, sourceLanguage, today,
   type Campus, type Dish, type DishDetail, type Filters, type Location, type Outlet, type Price, type PriceGroup, type Service
 } from './model'
-import { CampusPanelBody, PIN } from './campus/Panel'
+import { CampusPanelBody } from './campus/Panel'
 import { CampusPage } from './campus/Page'
 import { isCampusInstance, openCampus } from './campus/store'
 import { BUS_ICON, createElinkViews } from './elink/views'
@@ -174,23 +174,36 @@ const FILTER_ICONS: Record<keyof Filters, Shapes> = {
   lactoseFree: ['M8.5 3h7', 'M9 3v3L7 9.5V20a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9.5L15 6V3', 'M7 12.5h10', NO]
 }
 /**
- * ETH Zentrum: the main building seen from the Polyterrasse (long wings, the raised centre with its
- * two columns, arched door and flagpole); Höngg: the hill; UZH: the main building's round tower with
- * its dome and door between the hipped wings. Drawn sparse so they stay legible at 15px.
+ * ETH Zentrum: the main building's front from the Polyterrasse (26 Nov: long, low wings with their windows and
+ * a wider centre with three arched windows, the door and the flagpole); Höngg: the hill; UZH: the main building's
+ * round tower with its dome and door between the hipped wings. Drawn sparse so they stay legible at 15px.
  */
 const CAMPUS_ICONS: Record<Campus, Shapes> = {
-  eth: ['M2 20h20', 'M3 20v-7h5', 'M16 13h5v7', 'M8 20V8h8v12', 'M7 8h10', 'M12 8V4', 'M10.5 10.5V14', 'M13.5 10.5V14', 'M10.5 20v-2.5a1.5 1.5 0 0 1 3 0V20', 'M5.5 16.5h.01', 'M18.5 16.5h.01'],
+  eth: ['M1 18.5h22', 'M1.75 18.5v-5.5h5.75', 'M16.5 13h5.75v5.5', 'M7.5 18.5V10h9v8.5', 'M6.5 10h11', 'M12 10V6', 'M10.5 18.5v-2a1.5 1.5 0 0 1 3 0v2',
+    'M9.75 12.75h.01', 'M12 12.75h.01', 'M14.25 12.75h.01', 'M3.6 15.75h.01', 'M5.75 15.75h.01', 'M18.25 15.75h.01', 'M20.4 15.75h.01'],
   hoengg: ['M3 19h18', 'M3 19l6-9 4 5 3-3 5 7', 'M15 6.5a1.5 1.5 0 1 0 3 0a1.5 1.5 0 1 0-3 0'],
   uzh: ['M2 20h20', 'M3 20v-6l1.5-2h4', 'M15.5 12h4l1.5 2v6', 'M8.5 20v-9h7v9', 'M8.5 11a3.5 3.5 0 0 1 7 0', 'M12 7.5V6', 'M10.5 20v-2.5a1.5 1.5 0 0 1 3 0V20', 'M5.5 16.5h.01', 'M18.5 16.5h.01']
 }
 /**
- * The sidebar's feature tabs (row 2): the eLink shuttle (a bus, first; 25 Nov), the menu plan (fork and
- * knife) and the campus map (a location pin), saved in the hidden `mode` setting. 2.0.0 saved the campus
- * map's predecessor, Zürich 3D, as `city`.
+ * The sidebar's feature tabs (row 2): the eLink shuttle (a bus), the menu plan (fork and knife) and the campus
+ * map (ETH's main building, 26 Nov), saved in the hidden `mode` setting. 2.0.0 saved the campus map's
+ * predecessor, Zürich 3D, as `city`. Their order is the user's (26 Nov): the hidden `tabOrder` setting.
  */
 export type Mode = 'elink' | 'menu' | 'campus'
 export const MODES: Mode[] = ['elink', 'menu', 'campus']
-const MODE_ICONS: Record<Mode, Shapes> = { elink: BUS_ICON, menu: DISH, campus: PIN }
+const MODE_ICONS: Record<Mode, Shapes> = { elink: BUS_ICON, menu: DISH, campus: CAMPUS_ICONS.eth }
+/** The saved tab order: every mode once, unknown or repeated entries dropped, missing ones appended in the default order. */
+export function tabOrderOf(value: unknown): Mode[] {
+  const saved = Array.isArray(value) ? value.filter((item): item is Mode => MODES.includes(item as Mode)) : []
+  const order = [...new Set(saved)]
+  return [...order, ...MODES.filter(mode => !order.includes(mode))]
+}
+/** `order` with `mode` moved to `index`. */
+export function moveTab(order: readonly Mode[], mode: Mode, index: number): Mode[] {
+  const rest = order.filter(item => item !== mode)
+  rest.splice(Math.max(0, Math.min(index, rest.length)), 0, mode)
+  return rest
+}
 export const modeOf = (value: unknown): Mode => value === 'elink' ? 'elink' : value === 'campus' || value === 'city' ? 'campus' : 'menu'
 const STAR: Shapes = ['M12 3.6l2.6 5.25 5.8.85-4.2 4.1 1 5.8L12 16.85 6.8 19.6l1-5.8-4.2-4.1 5.8-.85z']
 /** The tags of row 2: Favorites first (shown once a place is starred), then the campuses. */
@@ -239,6 +252,7 @@ export function registerPolyViews(api: ValleyPluginApi, { t }: { t: (key: string
       language: sourceLanguage(api.ui.language()),
       locale: api.ui.language() || 'en',
       mode: modeOf(settings.mode),
+      tabOrder: tabOrderOf(settings.tabOrder),
       campus: (TAGS.includes(settings.campus as Tag) ? settings.campus : 'hoengg') as Tag,
       favorites: strings(settings.favorites),
       prices: (PRICE_CHOICES.includes(settings.prices as PriceShown) ? settings.prices : 'all') as PriceShown,
@@ -559,19 +573,67 @@ export function registerPolyViews(api: ValleyPluginApi, { t }: { t: (key: string
   const modeTitle = (mode: Mode) => t(mode === 'elink' ? 'elink.title' : mode === 'campus' ? 'campusMap.title' : 'menu.title')
   const elink = createElinkViews(api, t)
 
-  /** Row 2: the feature tabs, like Map's sidebar tab row (arrow keys, Home and End move between them). */
+  /**
+   * Row 2: the feature tabs, like Map's sidebar tab row (arrow keys, Home and End move between them). They are
+   * reordered by dragging one sideways (it follows the pointer, the others make room, the order is saved on
+   * release) or with Option/Alt + arrow keys on the focused tab.
+   */
   function Tabs({ preferences }: { preferences: Preferences }): Node {
+    const [drag, setDrag] = React.useState<{ mode: Mode; order: Mode[]; offset: number } | null>(null)
+    const dragged = React.useRef(false)
+    const order = drag?.order ?? preferences.tabOrder
+    const save = (next: Mode[]) => { if (next.join() !== preferences.tabOrder.join()) void api.settings.set('tabOrder', next) }
+    const startDrag = (event: PointerEvent, mode: Mode) => {
+      if (event.button !== 0) return
+      const button = event.currentTarget as HTMLElement
+      const row = button.parentElement
+      if (!row) return
+      const startX = event.clientX
+      const width = button.getBoundingClientRect().width + (parseFloat(getComputedStyle(row).columnGap) || 0)
+      const from = preferences.tabOrder.indexOf(mode)
+      let current: Mode[] = preferences.tabOrder
+      let moving = false
+      dragged.current = false
+      const view = button.ownerDocument.defaultView ?? window
+      const move = (e: PointerEvent) => {
+        const dx = e.clientX - startX
+        if (!moving && Math.abs(dx) < 4) return
+        if (!moving) { moving = true; dragged.current = true; button.setPointerCapture?.(e.pointerId) }
+        const index = Math.max(0, Math.min(MODES.length - 1, from + Math.round(dx / width)))
+        current = moveTab(preferences.tabOrder, mode, index)
+        setDrag({ mode, order: current, offset: dx - (current.indexOf(mode) - from) * width })
+      }
+      const end = () => {
+        view.removeEventListener('pointermove', move)
+        view.removeEventListener('pointerup', end)
+        view.removeEventListener('pointercancel', end)
+        setDrag(null)
+        if (moving) save(current)
+      }
+      view.addEventListener('pointermove', move)
+      view.addEventListener('pointerup', end)
+      view.addEventListener('pointercancel', end)
+    }
     return h('div', { className: 'poly-tabs', role: 'tablist', 'aria-label': t('mode.label') },
-      MODES.map((mode, index) => h('button', {
-        key: mode, type: 'button', role: 'tab', className: `poly-tab ${mode === preferences.mode ? 'active' : ''}`, 'aria-selected': mode === preferences.mode,
+      order.map((mode, index) => h('button', {
+        key: mode, type: 'button', role: 'tab', className: `poly-tab ${mode === preferences.mode ? 'active' : ''} ${drag?.mode === mode ? 'dragging' : ''}`, 'aria-selected': mode === preferences.mode,
         tabIndex: mode === preferences.mode ? 0 : -1, title: modeTitle(mode), 'aria-label': modeTitle(mode), 'data-mode': mode,
-        onClick: () => void api.settings.set('mode', mode),
+        style: drag?.mode === mode ? { transform: `translateX(${drag.offset}px)` } : undefined,
+        onPointerDown: (event: PointerEvent) => startDrag(event, mode),
+        onClick: () => { if (dragged.current) { dragged.current = false; return } void api.settings.set('mode', mode) },
         onKeyDown: (event: KeyboardEvent) => {
           if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
           event.preventDefault()
-          const next = event.key === 'Home' ? 0 : event.key === 'End' ? MODES.length - 1 : (index + (event.key === 'ArrowLeft' ? -1 : 1) + MODES.length) % MODES.length
-          void api.settings.set('mode', MODES[next])
-          ;((event.currentTarget as HTMLElement).parentElement?.children[next] as HTMLElement | undefined)?.focus()
+          const next = event.key === 'Home' ? 0 : event.key === 'End' ? order.length - 1 : event.altKey ? Math.max(0, Math.min(order.length - 1, index + (event.key === 'ArrowLeft' ? -1 : 1))) : (index + (event.key === 'ArrowLeft' ? -1 : 1) + order.length) % order.length
+          const target = event.currentTarget as HTMLElement
+          if (event.altKey) {
+            save(moveTab(order, mode, next))
+            // The moved tab keeps its focus once the row has re-rendered in the new order.
+            target.ownerDocument.defaultView?.requestAnimationFrame(() => (target.parentElement?.querySelector(`[data-mode="${mode}"]`) as HTMLElement | null)?.focus())
+            return
+          }
+          void api.settings.set('mode', order[next])
+          ;(target.parentElement?.children[next] as HTMLElement | undefined)?.focus()
         }
       }, h(Icon, { shapes: MODE_ICONS[mode] }))))
   }

@@ -89,6 +89,8 @@
   "mode.label": "Onglets de la barre latérale",
   "settings.mode.title": "Onglet de la barre latérale",
   "settings.mode.description": "L'onglet affiché dans la barre latérale : la navette eLink, le menu ou le plan du campus.",
+  "settings.tabOrder.title": "Ordre des onglets de la barre latérale",
+  "settings.tabOrder.description": "L'ordre des onglets de la barre latérale, modifié en faisant glisser un onglet ou avec Option et une flèche.",
   "city.display.color": "Couleur",
   "city.display.surfaces": "Surfaces",
   "city.display.height": "Hauteur",

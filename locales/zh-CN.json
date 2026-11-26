@@ -89,6 +89,8 @@
   "mode.label": "侧边栏标签",
   "settings.mode.title": "侧边栏标签",
   "settings.mode.description": "侧边栏显示的标签：eLink 班车、菜单或校园地图。",
+  "settings.tabOrder.title": "侧边栏标签顺序",
+  "settings.tabOrder.description": "侧边栏功能标签的顺序，可拖动标签或按 Option 加方向键更改。",
   "city.display.color": "颜色",
   "city.display.surfaces": "表面",
   "city.display.height": "高度",

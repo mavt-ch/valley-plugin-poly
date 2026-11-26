@@ -89,6 +89,8 @@
   "mode.label": "Sidebar tabs",
   "settings.mode.title": "Sidebar tab",
   "settings.mode.description": "The sidebar tab shown: the eLink shuttle, the menu plan or the campus map.",
+  "settings.tabOrder.title": "Sidebar tab order",
+  "settings.tabOrder.description": "The order of the sidebar's feature tabs, changed by dragging a tab or with Option and an arrow key.",
   "city.display.color": "Colour",
   "city.display.surfaces": "Surfaces",
   "city.display.height": "Height",

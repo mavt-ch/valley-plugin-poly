@@ -89,6 +89,8 @@
   "mode.label": "Pestañas de la barra lateral",
   "settings.mode.title": "Pestaña de la barra lateral",
   "settings.mode.description": "La pestaña que muestra la barra lateral: la lanzadera eLink, el menú o el mapa del campus.",
+  "settings.tabOrder.title": "Orden de las pestañas de la barra lateral",
+  "settings.tabOrder.description": "El orden de las pestañas de la barra lateral; se cambia arrastrando una pestaña o con Opción y una flecha.",
   "city.display.color": "Color",
   "city.display.surfaces": "Superficies",
   "city.display.height": "Altura",
