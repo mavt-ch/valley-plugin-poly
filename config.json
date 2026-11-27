@@ -159,7 +159,7 @@
         "type": "custom",
         "settingsVisible": false,
         "default": "menu",
-        "description": "The sidebar tab shown: the eLink shuttle, the menu plan or the campus map (2.0.0 saved the campus map's 3D predecessor as city, read as the campus map).",
+        "description": "The sidebar tab shown: the eLink shuttle, the menu plan, the campus map or ETH News (2.0.0 saved the campus map's 3D predecessor as city, read as the campus map).",
         "descriptionKey": "settings.mode.description",
         "schema": {
           "type": "string",
@@ -167,6 +167,7 @@
             "elink",
             "menu",
             "campus",
+            "news",
             "city"
           ]
         }
@@ -180,19 +181,21 @@
         "default": [
           "elink",
           "menu",
-          "campus"
+          "campus",
+          "news"
         ],
         "description": "The order of the sidebar's feature tabs, changed by dragging a tab or with Option and an arrow key.",
         "descriptionKey": "settings.tabOrder.description",
         "schema": {
           "type": "array",
-          "maxItems": 3,
+          "maxItems": 4,
           "items": {
             "type": "string",
             "enum": [
               "elink",
               "menu",
-              "campus"
+              "campus",
+              "news"
             ]
           }
         }
@@ -209,6 +212,43 @@
         "schema": {
           "type": "string",
           "maxLength": 10
+        }
+      },
+      {
+        "key": "newsFeed",
+        "label": "News feed",
+        "labelKey": "news.settings.feed.title",
+        "type": "custom",
+        "settingsVisible": false,
+        "default": "news",
+        "description": "The ETH News feed the News tab shows: every article, the Zukunftsblog, Globe or the media releases.",
+        "descriptionKey": "news.settings.feed.description",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "news",
+            "zukunftsblog",
+            "globe",
+            "media"
+          ]
+        }
+      },
+      {
+        "key": "newsTags",
+        "label": "News tags",
+        "labelKey": "news.settings.tags.title",
+        "type": "custom",
+        "settingsVisible": false,
+        "default": [],
+        "description": "The tags the News tab's article list is filtered by; an article must carry every one.",
+        "descriptionKey": "news.settings.tags.description",
+        "schema": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "maxLength": 200
+          }
         }
       },
       {
@@ -331,7 +371,8 @@
         "storage.googleapis.com",
         "arcgis-prd-web.ethz.ch",
         "server.arcgisonline.com",
-        "transport.opendata.ch"
+        "transport.opendata.ch",
+        "ethz.ch"
       ]
     },
     "storage": {

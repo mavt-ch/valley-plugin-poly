@@ -1,6 +1,6 @@
 # Poly
 
-ETH and UZH in Valley, in one Icon Rail entry (the Polybahn icon). Version 2.3.1 has three features, laid out like the Map plugin: the sidebar's first row names the shown feature and holds the page button, which opens that feature's page; the second row holds one icon tab per feature, **eLink** (bus), **Menu plan** (fork and knife) and **Campus map** (ETH's main building), in an order you can change by dragging.
+ETH and UZH in Valley, in one Icon Rail entry (the Polybahn icon). Version 2.8.0 has four features, laid out like the Map plugin: the sidebar's first row names the shown feature and holds the page button, which opens that feature's page; the second row holds one icon tab per feature, **eLink** (bus), **Menu plan** (fork and knife), **Campus map** (ETH's main building) and **ETH News** (newspaper), in an order you can change by dragging.
 
 ## eLink
 
@@ -59,15 +59,23 @@ npm run update-model
 
 The converter (`tooling/convert-citygml.mjs`) streams the CityGML, triangulates every wall, roof and ground polygon with earcut and writes 500 m tiles (`tiles/<x>_<y>.bin.gz`: positions quantized to 5 cm, delta-coded, equal vertices of a building shared, indices varint-coded, gzipped; plus a JSON list of the buildings with EGID, triangle range and bounds) and `index.json`. Coordinates stay in LV95 (EPSG:2056) with LN02 heights. The ground (`ground.bin`) is approximated from the base heights of the buildings on a 50 m grid and drawn only within 500 m of a building; it is not a terrain model. Data: Stadt Zürich, Open Government Data, free of use restrictions.
 
+## ETH News
+
+The four feeds ETH lists on [ethz.ch/en/utils/rss.html](https://ethz.ch/en/utils/rss.html), in English, or in German while Valley is in German, read in Valley.
+
+- **Left sidebar** (the newspaper tab): one tag per feed, each with its own glyph and colour, **News** (every ETH News article; a newspaper), **Blog** (the Zukunftsblog; a pen), **Globe** (the Globe magazine; a globe) and **Media** (the media releases; a megaphone), sharing the row equally, each tooltip counting its articles of the last seven days; then a search field (every word must appear in the title, summary, author or topics) with a tag button at its end: it lists every tag of the shown articles with its count; a click on a tag shows only articles with it, more tags narrow the list further, *Show all tags* clears it. A click on a tag chip in a row, card or article does the same and the chosen feed's articles drawn like Email's message list: title, date (*Today*, *Yesterday* or the day; the last seven days in the accent colour), the feed's summary, then its tags. Hovering a row already reads its article and picture, so it opens without waiting; what was read once stays in memory until Refresh. A click opens the article (⌘-click or middle click in a new tab); the right-click menu also opens it on ethz.ch. The article of the focused tab is marked.
+- **Page**: the page button opens the chosen feed as picture cards (the newest one wider on a wide page), each with its author and date, title, summary and tags; the picture comes from the article's own page once the card is on screen. An article opens in its own tab and is read in Valley, not as an embedded website: it opens at once with the feed's title, description, tags, date and author, and the rest fades in: the lead picture with its caption, then the text with its headings, lists, quotes, pictures, the grey boxes (*In brief*, *About*) as quiet callouts, videos as a preview that opens YouTube, and the link lists. A link to another ETH News article opens that article in Valley; other links go through Valley's link handling. The bar's arrow button opens the original page on ethz.ch.
+
 ## Data sources
 
 - ETH: the Cookpit service behind ETH's gastronomy page, `https://idapps.ethz.ch/cookpit-pub-services/v1/` (`facilities`, `weeklyrotas`), with the client id that page sends. Missing English texts (`novalue`) are filled from the German answer.
 - UZH: the food2050 pages of the ZFV, `https://app.food2050.ch/{de|en}/zfv/universitat-zurich…`. They have no public API; the plugin reads the structured payload each server-rendered page embeds (organisation page → outlets, outlet page → address and meal categories, `…/<category>/menu/weekly?week=&year=` → dishes, a dish's own page → picture and prices). Pictures come from `storage.googleapis.com/dish-images-prod/`.
 
 - Campus map: ETH's campus-map services on `arcgis-prd-web.ethz.ch` and Esri's blank base map from `server.arcgisonline.com` (see Building data).
+- ETH News: the Atom feeds `https://ethz.ch/{en|de}/news-und-veranstaltungen/eth-news/news/_jcr_content.feed.html` (every article, about 100 entries) with `?tag=news:dossiers/zukunftsblog`, `…/globe` or `…/medienmitteilung`, read again after 15 minutes; each article's page on `ethz.ch` (about 80 KB, kept 12 hours) and its pictures. The feed markers *News* and *Homehero* are not shown as topics.
 - eLink: `https://transport.opendata.ch/v1/stationboard?id=<id>&limit=420&datetime=<YYYY-MM-DD HH:MM>&transportations[]=bus&fields[]=…` for the stops 8591123 (ETH/Universitätsspital), 8591122 (ETH Hönggerberg) and 8587348 (Bahnhofplatz/HB); the next page starts at the minute the last one ended; a page with the asked fields is about 0.8 MB.
 
-Network requests run only in the backend, to `idapps.ethz.ch`, `app.food2050.ch`, `storage.googleapis.com`, `arcgis-prd-web.ethz.ch`, `server.arcgisonline.com` and `transport.opendata.ch` (the only declared hosts). Menu reads run two at a time; the open page's reads and pictures go before the list's background reads. Pictures reach the page as data addresses, read only once a card is on screen.
+Network requests run only in the backend, to `idapps.ethz.ch`, `app.food2050.ch`, `storage.googleapis.com`, `arcgis-prd-web.ethz.ch`, `server.arcgisonline.com`, `transport.opendata.ch` and `ethz.ch` (the only declared hosts). Menu reads run two at a time; the open page's reads and pictures go before the list's background reads. Pictures reach the page as data addresses, read only once a card is on screen.
 
 ## Build and test
 

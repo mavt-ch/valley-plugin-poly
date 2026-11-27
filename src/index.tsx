@@ -9,6 +9,7 @@ import { openCampus } from './campus/store'
 import { CAMPUS_CSS } from './campus/styles'
 import { registerCampusProperties } from './campus/properties'
 import { ELINK_CSS } from './elink/views'
+import { NEWS_CSS } from './news/views'
 import en from '../locales/en.json'
 import de from '../locales/de.json'
 import es from '../locales/es.json'
@@ -16,10 +17,11 @@ import fr from '../locales/fr.json'
 import zh from '../locales/zh-CN.json'
 
 /**
- * Poly: ETH and UZH in Valley. One left-sidebar panel (Icon Rail) with three tabs: the eLink shuttle,
- * the menu plan of ETH Zentrum, ETH Hönggerberg and the UZH outlets, and the campus map (ETH's buildings
- * in 2D and in the Stadt Zürich 3D model); one page shows a place's menus or, with instance `elink`, the
- * eLink timetable of the day, or with instance `campus`, the campus map.
+ * Poly: ETH and UZH in Valley. One left-sidebar panel (Icon Rail) with four tabs: the eLink shuttle,
+ * the menu plan of ETH Zentrum, ETH Hönggerberg and the UZH outlets, the campus map (ETH's buildings
+ * in 2D and in the Stadt Zürich 3D model) and ETH News; one page shows a place's menus or, with instance
+ * `elink`, the eLink timetable of the day, with instance `campus` the campus map, with `news` the news
+ * feed and with `news:<article>` one article.
  */
 export function register(api: ValleyPluginApi) {
   const offCatalogs = api.ui.registerCatalogs({ en, de, es, fr, 'zh-CN': zh })
@@ -29,7 +31,7 @@ export function register(api: ValleyPluginApi) {
   const disposeCityStyles = injectStyles()
   const style = document.createElement('style')
   style.id = 'poly-styles'
-  style.textContent = VIEWS_CSS + CAMPUS_CSS + ELINK_CSS
+  style.textContent = VIEWS_CSS + CAMPUS_CSS + ELINK_CSS + NEWS_CSS
   document.getElementById(style.id)?.remove()
   document.head.appendChild(style)
   readSettings()

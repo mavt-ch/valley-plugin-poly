@@ -8,6 +8,8 @@ import {
 import { registerCity } from './city'
 import { registerCampus } from './campus'
 import { registerElink } from './elink'
+import { registerNews } from './news'
+import { isNewsImageUrl } from '../news/model'
 
 const MENU_TTL = 30 * 60_000
 const LIST_TTL = 12 * 3_600_000
@@ -74,11 +76,11 @@ export function register(api: PluginBackendApi): () => Promise<void> {
     return value
   }
 
-  /** A dish picture as a data address the sandboxed view can show; the UI has no network of its own. */
+  /** A dish or ETH News picture as a data address the sandboxed view can show; the UI has no network of its own. */
   const images = new Map<string, { at: number; value: Promise<string> }>()
   const image = async (raw: unknown): Promise<string> => {
     const url = input(raw).url
-    if (!isImageUrl(url)) throw new Error('invalidInput')
+    if (!isImageUrl(url) && !isNewsImageUrl(url)) throw new Error('invalidInput')
     const hit = images.get(url)
     if (hit && Date.now() - hit.at < IMAGE_TTL) { images.delete(url); images.set(url, hit); return hit.value }
     // Cookpit answers 406 to `image/*` alone; it serves its pictures only when `*/*` is accepted too.
@@ -176,11 +178,13 @@ export function register(api: PluginBackendApi): () => Promise<void> {
   ]
   const disposeCampus = registerCampus(api)
   const disposeElink = registerElink(api)
+  const disposeNews = registerNews(api)
   return async () => {
     disposed = true
     for (const off of offs) off()
     await disposeCampus()
     await disposeElink()
+    await disposeNews()
     await Promise.all([...requests].map(id => api.network.cancel(id).catch(() => false)))
     memo.clear()
     images.clear()
