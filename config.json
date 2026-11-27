@@ -240,7 +240,7 @@
         "type": "custom",
         "settingsVisible": false,
         "default": [],
-        "description": "The tags the News tab's article list is filtered by; an article must carry every one.",
+        "description": "The tags the News tab's article list is filtered by; an article with any of them is shown.",
         "descriptionKey": "news.settings.tags.description",
         "schema": {
           "type": "array",

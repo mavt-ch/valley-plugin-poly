@@ -61,6 +61,15 @@ export const NEWS_CSS = `
 .news-topic:hover { background: color-mix(in srgb, var(--title-color) 12%, var(--hover-bg)); color: var(--text-color); }
 .news-topic.on { background: var(--accent-tint-bg); color: var(--accent-color); }
 .news-topic:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 1px; }
+.poly-icon-btn.filtered:not(.active) { color: var(--accent-color); }
+/* The tag view: every tag of the feed as chips in place of the list; chosen ones in the accent tint. */
+.news-tag-view { padding: 10px 12px 4px; }
+.news-tag-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; color: var(--text-secondary); font-size: var(--small-font-size); }
+.news-cloud { display: flex; flex-wrap: wrap; gap: 6px; }
+.news-cloud .news-topic { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; height: 26px; padding: 0 9px; font-size: var(--small-font-size); line-height: 1; }
+.news-cloud .news-topic > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.news-cloud-count { color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); font-variant-numeric: tabular-nums; }
+.news-cloud .news-topic.on .news-cloud-count { color: inherit; opacity: 0.8; }
 .news-text-btn { padding: 0; border: 0; background: transparent; color: var(--accent-color); font: inherit; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .news-search-bar .search-field-icon { display: grid; place-items: center; }
 .news-search-bar .search-field-icon svg, .news-search-bar .search-field-action svg { width: 14px; height: 14px; }
@@ -158,8 +167,8 @@ export function searchEntries(entries: NewsEntry[], query: string): NewsEntry[] 
   return entries.filter(entry => { const text = [entry.title, entry.summary, entry.author, ...entry.topics].join(' ').toLocaleLowerCase(); return words.every(word => text.includes(word)) })
 }
 
-/** Entries carrying every chosen tag; no tag chosen keeps them all. */
-export const withTags = (entries: NewsEntry[], tags: readonly string[]) => tags.length ? entries.filter(entry => tags.every(tag => entry.topics.includes(tag))) : entries
+/** Entries carrying at least one chosen tag (27 Nov: the tag view selects like tags, so more tags show more); none chosen keeps them all. */
+export const withTags = (entries: NewsEntry[], tags: readonly string[]) => tags.length ? entries.filter(entry => tags.some(tag => entry.topics.includes(tag))) : entries
 /** The tags of `entries` with how many carry each, the most used first, then by name. */
 export function tagCounts(entries: NewsEntry[], locale = 'en'): { tag: string; count: number }[] {
   const counts = new Map<string, number>()
@@ -361,35 +370,46 @@ export function createNewsViews(api: ValleyPluginApi, t: (key: string) => string
   }
 
   /**
-   * The tag filter beside the search: a menu of every tag of the listed articles with its count (the chosen
-   * ones ticked and always offered); a click adds or removes a tag, and several tags narrow the list further.
+   * The tag button beside the search (27 Nov, on request): it swaps the sidebar's article list for every tag of
+   * the feed and back; filled while the tags are shown, the icon in the accent colour while a filter is on.
    */
-  function TagButton({ entries, chosen }: { entries: NewsEntry[]; chosen: string[] }): Node {
-    const active = chosen.length > 0
-    const pick = async (event: MouseEvent) => {
-      const offered = tagCounts(withTags(entries, chosen), locale())
-      const missing = chosen.filter(tag => !offered.some(row => row.tag === tag)).map(tag => ({ tag, count: 0 }))
-      const rows = [...offered.filter(row => chosen.includes(row.tag)), ...missing, ...offered.filter(row => !chosen.includes(row.tag))]
-      const choice = await api.ui.openMenu([
-        ...(rows.length ? rows.map(row => ({ id: `tag:${row.tag}`, type: 'checkbox' as const, label: `${row.tag} · ${row.count}`, checked: chosen.includes(row.tag) }))
-          : [{ id: 'none', label: t('news.tags.none'), enabled: false }]),
-        ...(active ? [{ type: 'separator' as const }, { id: 'clear', label: t('news.tags.clear'), icon: h(Icon, { shapes: CLOSE }) }] : [])
-      ], { anchor: event.currentTarget as HTMLElement, align: 'end' })
-      if (choice === 'clear') clearTags()
-      else if (choice?.startsWith('tag:')) toggleTag(choice.slice(4))
-    }
-    const label = active ? `${t('news.tags.filter')} · ${chosen.join(', ')}` : t('news.tags.filter')
-    return h('button', { type: 'button', className: `poly-icon-btn${active ? ' active' : ''}`, title: label, 'aria-label': label, 'aria-haspopup': 'menu', 'data-tags': chosen.length || undefined, onClick: pick }, h(Icon, { shapes: TAG_ICON }))
+  function TagButton({ open, chosen, toggle }: { open: boolean; chosen: string[]; toggle: () => void }): Node {
+    const label = open ? t('news.tags.hide') : chosen.length ? `${t('news.tags.show')} · ${chosen.join(', ')}` : t('news.tags.show')
+    return h('button', { type: 'button', className: `poly-icon-btn${open ? ' active' : ''}${chosen.length ? ' filtered' : ''}`, title: label, 'aria-label': label, 'aria-pressed': open, 'data-tag-view': true, onClick: toggle }, h(Icon, { shapes: TAG_ICON }))
   }
 
-  function SearchRow({ query, setQuery, entries, chosen }: { query: string; setQuery: (value: string) => void; entries: NewsEntry[]; chosen: string[] }): Node {
+  /**
+   * Every tag of the feed as chips in place of the article list, the most used first, each with its number of
+   * articles; a click selects a tag and another click deselects it. The search field narrows the tags here.
+   */
+  function TagView({ entries, chosen, query }: { entries: NewsEntry[]; chosen: string[]; query: string }): Node {
+    const words = query.toLocaleLowerCase().split(/\s+/).filter(Boolean)
+    const all = tagCounts(entries, locale())
+    const missing = chosen.filter(tag => !all.some(row => row.tag === tag)).map(tag => ({ tag, count: 0 }))
+    const rows = [...all, ...missing].filter(row => words.every(word => row.tag.toLocaleLowerCase().includes(word)))
+    const shown = withTags(entries, chosen).length
+    return h('div', { className: 'news-tag-view news-appear' },
+      h('div', { className: 'news-tag-head' },
+        h('span', null, chosen.length ? (shown === 1 ? t('news.tags.articles.one') : fill(t('news.tags.articles.other'), { count: shown })) : fill(t('news.tags.count'), { count: all.length })),
+        chosen.length ? h('button', { type: 'button', className: 'news-text-btn', onClick: clearTags }, t('news.tags.clear')) : null),
+      rows.length
+        ? h('div', { className: 'news-cloud', role: 'group', 'aria-label': t('news.tags.show') }, rows.map(row => {
+          const on = chosen.includes(row.tag)
+          return h('button', { key: row.tag, type: 'button', className: `news-topic${on ? ' on' : ''}`, 'aria-pressed': on, 'data-tag': row.tag, title: fill(t(on ? 'news.tags.remove' : 'news.tags.add'), { tag: row.tag }), onClick: () => toggleTag(row.tag) },
+            h('span', null, row.tag), h('span', { className: 'news-cloud-count' }, String(row.count)))
+        }))
+        : h('div', { className: 'poly-note' }, query ? t('news.tags.noMatch') : t('news.tags.none')))
+  }
+
+  function SearchRow({ query, setQuery, tagView, chosen, toggleTags }: { query: string; setQuery: (value: string) => void; tagView: boolean; chosen: string[]; toggleTags: () => void }): Node {
+    const placeholder = t(tagView ? 'news.tags.search' : 'news.search')
     return h('div', { className: 'poly-bar news-search-bar' },
       h('div', { className: 'search-field-row' },
         h('div', { className: 'search-field' },
           h('span', { className: 'search-field-icon' }, h(Icon, { shapes: SEARCH })),
-          h('input', { className: 'search-field-input', value: query, placeholder: t('news.search'), 'aria-label': t('news.search'), onChange: (event: { target: HTMLInputElement }) => setQuery(event.target.value), onKeyDown: (event: KeyboardEvent) => { if (event.key === 'Escape') setQuery('') } }),
+          h('input', { className: 'search-field-input', value: query, placeholder, 'aria-label': placeholder, onChange: (event: { target: HTMLInputElement }) => setQuery(event.target.value), onKeyDown: (event: KeyboardEvent) => { if (event.key === 'Escape') setQuery('') } }),
           query ? h('button', { type: 'button', className: 'search-field-action', title: t('news.search.clear'), 'aria-label': t('news.search.clear'), onClick: () => setQuery('') }, h(Icon, { shapes: CLOSE })) : null)),
-      h(TagButton, { entries, chosen }))
+      h(TagButton, { open: tagView, chosen, toggle: toggleTags }))
   }
 
   /**
@@ -430,6 +450,9 @@ export function createNewsViews(api: ValleyPluginApi, t: (key: string) => string
     const { feed, tags, language: lang } = usePreferences()
     const { revision, refresh } = useRefresh()
     const [query, setQuery] = React.useState('')
+    const [tagView, setTagView] = React.useState(false)
+    // Each view keeps its own search: articles here, tag names in the tag view.
+    const [tagQuery, setTagQuery] = React.useState('')
     const byFeed = useFeeds(feed, lang, revision)
     const state = useFeed(feed, lang, revision)
     const open = useActiveInstance()
@@ -438,11 +461,12 @@ export function createNewsViews(api: ValleyPluginApi, t: (key: string) => string
     const empty = query ? t('news.empty.search') : tags.length ? t('news.empty.tags') : t('news.empty')
     const body = state.error ? h('div', { className: 'poly-note error', role: 'alert' }, state.error)
       : !state.data ? h(RowPlaceholders, null)
+      : tagView ? h(TagView, { entries, chosen: tags, query: tagQuery })
       : !listed.length ? h('div', { className: 'poly-note' }, empty, tags.length ? h(React.Fragment, null, ' ', h('button', { type: 'button', className: 'news-text-btn', onClick: clearTags }, t('news.tags.clear'))) : null)
       : h('div', { className: 'news-appear' }, ...listed.map(entry => h(Row, { key: entry.id, entry, active: open === articleInstance(entry.url), refresh, chosen: tags })))
     return h(React.Fragment, null,
       h(FeedTags, { chosen: feed, byFeed }),
-      h(SearchRow, { query, setQuery, entries, chosen: tags }),
+      h(SearchRow, { query: tagView ? tagQuery : query, setQuery: tagView ? setTagQuery : setQuery, tagView, chosen: tags, toggleTags: () => setTagView(value => !value) }),
       h('div', { className: 'news-list' }, body, h('div', { className: 'poly-credit' }, t('news.credit'))))
   }
 

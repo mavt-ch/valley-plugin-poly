@@ -129,47 +129,49 @@ describe('ETH News views', () => {
     expect((api.backend.call as unknown as { mock: { calls: [string, Record<string, unknown>][] } }).mock.calls.slice(before).some(([name]) => name === 'news.article')).toBe(false)
   })
 
-  it('filters the list by tags from the tag button beside the search and from the tag chips', async () => {
-    const { container, settings, api } = harness('panel')
+  it('swaps the list for every tag as chips; a click selects a tag, another deselects it, and the button brings the articles back', async () => {
+    const { container, settings } = harness('panel')
     await settle()
-    const menus: unknown[][] = []
-    const answers = ['tag:D-MAVT', 'tag:Research', 'clear']
-    api.ui.openMenu = vi.fn(async (items: unknown[]) => { menus.push(items); return answers.shift() ?? null }) as unknown as typeof api.ui.openMenu
-    const button = container.querySelector('.news-search-bar .poly-icon-btn[aria-haspopup="menu"]')!
-    expect(button.getAttribute('aria-label')).toBe('Filter by tags')
+    const button = container.querySelector('.news-search-bar [data-tag-view]')!
+    expect(button.getAttribute('aria-label')).toBe('Show tags')
     fireEvent.click(button)
     await settle()
-    const labels = (menus[0] as { label?: string; checked?: boolean }[]).map(item => item.label)
-    // Every tag of the feed with its count, the most used first, then by name.
-    expect(labels).toEqual(['Climate sciences · 1', 'D-MAVT · 1', 'Innovation & Industry · 1', 'Research · 1', 'Students · 1'])
+    expect(container.querySelector('.news-row')).toBeNull()
+    expect(button.getAttribute('aria-pressed')).toBe('true')
+    expect(container.querySelector('.search-field-input')?.getAttribute('placeholder')).toBe('Search tags')
+    const chips = () => [...container.querySelectorAll('.news-cloud .news-topic')]
+    expect(chips().map(chip => chip.textContent)).toEqual(['Climate sciences1', 'D-MAVT1', 'Innovation & Industry1', 'Research1', 'Students1'])
+    expect(container.querySelector('.news-tag-head')?.textContent).toBe('5 tags')
+    fireEvent.click(chips()[1])
+    await settle()
     expect(settings.newsTags).toEqual(['D-MAVT'])
-    expect([...container.querySelectorAll('.news-row')].map(row => row.getAttribute('data-article'))).toEqual([ARTICLE_URL])
-    expect(button.className).toContain('active')
-    // With D-MAVT chosen the menu offers only the tags of the remaining article, the chosen one first and ticked.
+    fireEvent.click(chips()[4])
+    await settle()
+    expect(settings.newsTags).toEqual(['D-MAVT', 'Students'])
+    expect(chips().filter(chip => chip.classList.contains('on')).map(chip => chip.getAttribute('data-tag'))).toEqual(['D-MAVT', 'Students'])
+    expect(container.querySelector('.news-tag-head')?.textContent).toBe('2 articlesClear')
+    // A second click deselects.
+    fireEvent.click(chips()[4])
+    await settle()
+    expect(settings.newsTags).toEqual(['D-MAVT'])
+    // The search narrows the tags in this view and keeps the article search apart.
+    fireEvent.change(container.querySelector('.search-field-input')!, { target: { value: 'sci' } })
+    expect(chips().map(chip => chip.getAttribute('data-tag'))).toEqual(['Climate sciences'])
     fireEvent.click(button)
     await settle()
-    expect((menus[1] as { label?: string; checked?: boolean; id?: string }[]).filter(item => item.id?.startsWith('tag:')).map(item => [item.label, item.checked])).toEqual([['D-MAVT · 1', true], ['Innovation & Industry · 1', false], ['Research · 1', false]])
-    expect(settings.newsTags).toEqual(['D-MAVT', 'Research'])
-    fireEvent.click(button)
+    expect((container.querySelector('.search-field-input') as HTMLInputElement).value).toBe('')
+    expect([...container.querySelectorAll('.news-row')].map(row => row.getAttribute('data-article'))).toEqual([ARTICLE_URL])
+    expect(button.className).toContain('filtered')
+    // A chip in a row toggles its tag too; tags add up: an article with any chosen tag is listed.
+    fireEvent.click(container.querySelector(`[data-article="${ARTICLE_URL}"] .news-topic.on`)!)
     await settle()
     expect(settings.newsTags).toEqual([])
     expect(container.querySelectorAll('.news-row')).toHaveLength(3)
-    // A chip filters without opening the article; the chosen chip is marked.
-    fireEvent.click([...container.querySelectorAll(`[data-article="${SECOND_URL}"] .news-topic`)].find(chip => chip.textContent === 'Students')!)
-    await settle()
-    expect(settings.newsTags).toEqual(['Students'])
-    expect(container.querySelectorAll('.news-row')).toHaveLength(1)
-    expect(container.querySelector('.news-topic.on')?.textContent).toBe('Students')
-    await act(async () => { await api.settings.set('newsTags', ['Students', 'Research']) })
-    expect(container.querySelector('.poly-note')?.textContent).toContain('No article has all chosen tags.')
-    fireEvent.click(container.querySelector('.news-text-btn')!)
-    await settle()
-    expect(settings.newsTags).toEqual([])
   })
 
   it('searches every word and counts the last seven days as new', () => {
     expect(tagCounts(parseFeed(FEED)).map(row => row.tag)).toEqual(['Climate sciences', 'D-MAVT', 'Innovation & Industry', 'Research', 'Students'])
-    expect(withTags(parseFeed(FEED), ['Research', 'D-MAVT']).map(entry => entry.url)).toEqual([ARTICLE_URL])
+    expect(withTags(parseFeed(FEED), ['Research', 'Students']).map(entry => entry.url)).toEqual([ARTICLE_URL, SECOND_URL])
     expect(newsTagsOf(['a', 'a', 3, ''])).toEqual(['a'])
     const entries = parseFeed(FEED)
     expect(searchEntries(entries, 'rover SAND').map(entry => entry.url)).toEqual([SECOND_URL])
