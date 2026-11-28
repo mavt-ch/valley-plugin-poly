@@ -10,6 +10,7 @@ import { CAMPUS_CSS } from './campus/styles'
 import { registerCampusProperties } from './campus/properties'
 import { ELINK_CSS } from './elink/views'
 import { NEWS_CSS } from './news/views'
+import { POLYBOX_CSS } from './polybox/views'
 import en from '../locales/en.json'
 import de from '../locales/de.json'
 import es from '../locales/es.json'
@@ -17,11 +18,11 @@ import fr from '../locales/fr.json'
 import zh from '../locales/zh-CN.json'
 
 /**
- * Poly: ETH and UZH in Valley. One left-sidebar panel (Icon Rail) with four tabs: the eLink shuttle,
+ * Poly: ETH and UZH in Valley. One left-sidebar panel (Icon Rail) with five tabs: the eLink shuttle,
  * the menu plan of ETH Zentrum, ETH Hönggerberg and the UZH outlets, the campus map (ETH's buildings
- * in 2D and in the Stadt Zürich 3D model) and ETH News; one page shows a place's menus or, with instance
+ * in 2D and in the Stadt Zürich 3D model), ETH News and the user's Polybox links; one page shows a place's menus or, with instance
  * `elink`, the eLink timetable of the day, with instance `campus` the campus map, with `news` the news
- * feed and with `news:<article>` one article.
+ * feed, with `news:<article>` one article and with `polybox` the table of subjects and Polybox links.
  */
 export function register(api: ValleyPluginApi) {
   const offCatalogs = api.ui.registerCatalogs({ en, de, es, fr, 'zh-CN': zh })
@@ -31,7 +32,7 @@ export function register(api: ValleyPluginApi) {
   const disposeCityStyles = injectStyles()
   const style = document.createElement('style')
   style.id = 'poly-styles'
-  style.textContent = VIEWS_CSS + CAMPUS_CSS + ELINK_CSS + NEWS_CSS
+  style.textContent = VIEWS_CSS + CAMPUS_CSS + ELINK_CSS + NEWS_CSS + POLYBOX_CSS
   document.getElementById(style.id)?.remove()
   document.head.appendChild(style)
   readSettings()

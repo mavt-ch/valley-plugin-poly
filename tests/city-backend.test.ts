@@ -39,8 +39,9 @@ describe('backend', () => {
     expect(storage.stat).not.toHaveBeenCalled()
   })
 
-  it('declares a read grant only for the realm-installed model', () => {
-    expect(config.permissions.storage.metadata).toEqual([MODEL_FOLDER])
+  it('declares metadata storage only for the realm-installed model and Polybox\'s kept files', () => {
+    expect(config.permissions.storage.metadata).toEqual([MODEL_FOLDER, 'plugins/data/poly/polybox'])
+    expect(Object.keys(config.permissions.storage)).toEqual(['metadata'])
   })
 
   it('reads model files in chunks as bytes', async () => {

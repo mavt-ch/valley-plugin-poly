@@ -9,6 +9,7 @@ import { registerCity } from './city'
 import { registerCampus } from './campus'
 import { registerElink } from './elink'
 import { registerNews } from './news'
+import { registerPolybox } from './polybox'
 import { isNewsImageUrl } from '../news/model'
 
 const MENU_TTL = 30 * 60_000
@@ -179,12 +180,14 @@ export function register(api: PluginBackendApi): () => Promise<void> {
   const disposeCampus = registerCampus(api)
   const disposeElink = registerElink(api)
   const disposeNews = registerNews(api)
+  const disposePolybox = registerPolybox(api)
   return async () => {
     disposed = true
     for (const off of offs) off()
     await disposeCampus()
     await disposeElink()
     await disposeNews()
+    await disposePolybox()
     await Promise.all([...requests].map(id => api.network.cancel(id).catch(() => false)))
     memo.clear()
     images.clear()

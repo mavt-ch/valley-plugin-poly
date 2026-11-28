@@ -295,3 +295,67 @@ export function parseBlocks(html: string, base: string): Block[] {
   })
   return prune(root)
 }
+
+/** The Saved folder beside the four feeds: a source of the News tab, chosen in the same `newsFeed` setting. */
+export type NewsSource = NewsFeed | 'saved'
+export const SAVED: NewsSource = 'saved'
+export const newsSourceOf = (value: unknown): NewsSource => value === 'saved' ? 'saved' : newsFeedOf(value)
+/** At most this many saved articles; saving one more drops the oldest saved. */
+export const MAX_SAVED = 500
+
+/** A saved article: what its row and card need without the network (27 Nov: a flat Saved folder, not Valley's Bookmarks). */
+export type SavedArticle = {
+  url: string
+  title: string
+  summary: string
+  /** ISO time the feed or the page gave, else empty. */
+  published: string
+  author: string
+  topics: string[]
+  /** The lead picture's address (an ETH News picture), else empty. */
+  picture: string
+  /** ISO time it was saved. */
+  savedAt: string
+}
+
+const text = (value: unknown, max: number) => typeof value === 'string' ? value.slice(0, max) : ''
+/** One saved article within the `newsSaved` schema's limits, else null (no ETH News address, no title). */
+function savedRow(value: unknown): SavedArticle | null {
+  if (!value || typeof value !== 'object') return null
+  const row = value as Record<string, unknown>
+  const title = text(row.title, 400)
+  if (!isArticleUrl(row.url) || row.url.length > 400 || !title) return null
+  return {
+    url: row.url, title, summary: text(row.summary, 2000), published: text(row.published, 40), author: text(row.author, 200),
+    topics: Array.isArray(row.topics) ? [...new Set(row.topics.filter((topic): topic is string => typeof topic === 'string' && topic.length > 0).map(topic => topic.slice(0, 200)))].slice(0, 30) : [],
+    picture: isNewsImageUrl(row.picture) && row.picture.length <= 600 ? row.picture : '',
+    savedAt: text(row.savedAt, 40)
+  }
+}
+/** The saved list from settings: valid ETH News addresses only, each once, newest saved first, at most `MAX_SAVED`. */
+export function savedOf(value: unknown): SavedArticle[] {
+  if (!Array.isArray(value)) return []
+  const seen = new Set<string>()
+  const list: SavedArticle[] = []
+  for (const item of value) {
+    const row = savedRow(item)
+    if (!row || seen.has(row.url)) continue
+    seen.add(row.url)
+    list.push(row)
+  }
+  return list.sort((a, b) => (Date.parse(b.savedAt) || 0) - (Date.parse(a.savedAt) || 0)).slice(0, MAX_SAVED)
+}
+export const isSaved = (list: readonly SavedArticle[], url: string) => list.some(item => item.url === url)
+/** The entry saved in front of the others (saving it again moves it to the front); the oldest saved go past `MAX_SAVED`. */
+export const withSaved = (list: readonly SavedArticle[], article: SavedArticle) => [article, ...list.filter(item => item.url !== article.url)].slice(0, MAX_SAVED)
+export const withoutSaved = (list: readonly SavedArticle[], url: string) => list.filter(item => item.url !== url)
+/** What to keep of an article: the feed's entry, else what its page said, and the lead picture when known. */
+export function savedArticle(url: string, from: { entry?: NewsEntry; article?: NewsArticle | null }, savedAt: string): SavedArticle | null {
+  const { entry, article } = from
+  return savedRow({
+    url, title: entry?.title || article?.title || '', summary: entry?.summary || article?.lead || '', published: entry?.published || article?.date || '',
+    author: entry?.author || article?.author || '', topics: entry?.topics.length ? entry.topics : article?.topics ?? [], picture: article?.picture?.src ?? '', savedAt
+  })
+}
+/** A saved article drawn like a feed entry (its address is its id). */
+export const savedEntry = (saved: SavedArticle): NewsEntry => ({ id: saved.url, url: saved.url, title: saved.title, summary: saved.summary, published: saved.published, author: saved.author, topics: saved.topics })

@@ -1,7 +1,7 @@
 /**
  * Poly's two surfaces:
  * - `poly.panel` (left sidebar, an Icon Rail entry): row 1 the shown feature's name and the page button,
- *   row 2 the feature tabs (eLink, Menu plan, Campus map, News) drawn like Map's sidebar tabs, then the feature's body:
+ *   row 2 the feature tabs (eLink, Menu plan, Campus map, News, Polybox) drawn like Map's sidebar tabs, then the feature's body:
  *   for the menu plan the campus tags (ETH, Höngg, UZH), the day with Lunch | Dinner and one row per place;
  *   for the campus map the building search, the selected building and the buildings by campus;
  * - `poly.page` (main workspace): one place's menus as picture cards (`instanceId` `place:<id>`),
@@ -21,6 +21,8 @@ import { BUS_ICON, createElinkViews } from './elink/views'
 import { isElinkInstance } from './elink/model'
 import { NEWS_ICON, createNewsViews } from './news/views'
 import { isNewsInstance } from './news/model'
+import { POLYBOX_ICON, createPolyboxViews } from './polybox/views'
+import { isPolyboxInstance } from './polybox/model'
 
 export const VIEWS_CSS = `
 .poly-panel, .poly-page { display: flex; flex-direction: column; height: 100%; min-height: 0; overflow: hidden; }
@@ -188,12 +190,12 @@ const CAMPUS_ICONS: Record<Campus, Shapes> = {
 }
 /**
  * The sidebar's feature tabs (row 2): the eLink shuttle (a bus), the menu plan (fork and knife), the campus
- * map (ETH's main building, 26 Nov) and ETH News (a newspaper, 27 Nov), saved in the hidden `mode` setting. 2.0.0 saved the campus map's
+ * map (ETH's main building, 26 Nov), ETH News (a newspaper, 27 Nov) and Polybox (two clouds, 27 Nov), saved in the hidden `mode` setting. 2.0.0 saved the campus map's
  * predecessor, Zürich 3D, as `city`. Their order is the user's (26 Nov): the hidden `tabOrder` setting.
  */
-export type Mode = 'elink' | 'menu' | 'campus' | 'news'
-export const MODES: Mode[] = ['elink', 'menu', 'campus', 'news']
-const MODE_ICONS: Record<Mode, Shapes> = { elink: BUS_ICON, menu: DISH, campus: CAMPUS_ICONS.eth, news: NEWS_ICON }
+export type Mode = 'elink' | 'menu' | 'campus' | 'news' | 'polybox'
+export const MODES: Mode[] = ['elink', 'menu', 'campus', 'news', 'polybox']
+const MODE_ICONS: Record<Mode, Shapes> = { elink: BUS_ICON, menu: DISH, campus: CAMPUS_ICONS.eth, news: NEWS_ICON, polybox: POLYBOX_ICON }
 /** The saved tab order: every mode once, unknown or repeated entries dropped, missing ones appended in the default order. */
 export function tabOrderOf(value: unknown): Mode[] {
   const saved = Array.isArray(value) ? value.filter((item): item is Mode => MODES.includes(item as Mode)) : []
@@ -206,7 +208,7 @@ export function moveTab(order: readonly Mode[], mode: Mode, index: number): Mode
   rest.splice(Math.max(0, Math.min(index, rest.length)), 0, mode)
   return rest
 }
-export const modeOf = (value: unknown): Mode => value === 'elink' || value === 'news' ? value : value === 'campus' || value === 'city' ? 'campus' : 'menu'
+export const modeOf = (value: unknown): Mode => value === 'elink' || value === 'news' || value === 'polybox' ? value : value === 'campus' || value === 'city' ? 'campus' : 'menu'
 const STAR: Shapes = ['M12 3.6l2.6 5.25 5.8.85-4.2 4.1 1 5.8L12 16.85 6.8 19.6l1-5.8-4.2-4.1 5.8-.85z']
 /** The tags of row 2: Favorites first (shown once a place is starred), then the campuses. */
 type Tag = 'favorites' | Campus
@@ -572,9 +574,10 @@ export function registerPolyViews(api: ValleyPluginApi, { t }: { t: (key: string
     return h(React.Fragment, null, ...rows, note ? h('div', { className: 'poly-note' }, note) : null)
   }
 
-  const modeTitle = (mode: Mode) => t(mode === 'elink' ? 'elink.title' : mode === 'campus' ? 'campusMap.title' : mode === 'news' ? 'news.title' : 'menu.title')
+  const modeTitle = (mode: Mode) => t(mode === 'elink' ? 'elink.title' : mode === 'campus' ? 'campusMap.title' : mode === 'news' ? 'news.title' : mode === 'polybox' ? 'polybox.title' : 'menu.title')
   const elink = createElinkViews(api, t)
   const news = createNewsViews(api, t)
+  const polybox = createPolyboxViews(api, t)
 
   /**
    * Row 2: the feature tabs, like Map's sidebar tab row (arrow keys, Home and End move between them). They are
@@ -644,8 +647,8 @@ export function registerPolyViews(api: ValleyPluginApi, { t }: { t: (key: string
   /** Row 1: the shown feature's name and the page button, which opens that feature's page. */
   function PanelHeader({ preferences }: { preferences: Preferences }): Node {
     const mode = preferences.mode
-    const open = (newTab: boolean) => mode === 'elink' ? elink.openElink(newTab) : mode === 'campus' ? openCampus(t('campusMap.title'), newTab) : mode === 'news' ? news.openNews(newTab) : api.workspace.openMainTab({ newTab })
-    const label = t(mode === 'elink' ? 'elink.openPage' : mode === 'campus' ? 'campusMap.openPage' : mode === 'news' ? 'news.openPage' : 'openPage')
+    const open = (newTab: boolean) => mode === 'elink' ? elink.openElink(newTab) : mode === 'campus' ? openCampus(t('campusMap.title'), newTab) : mode === 'news' ? news.openNews(newTab) : mode === 'polybox' ? polybox.openPolybox(newTab) : api.workspace.openMainTab({ newTab })
+    const label = t(mode === 'elink' ? 'elink.openPage' : mode === 'campus' ? 'campusMap.openPage' : mode === 'news' ? 'news.openPage' : mode === 'polybox' ? 'polybox.openPage' : 'openPage')
     return h('div', { className: 'panel-header' },
       h('span', { className: 'panel-title' }, modeTitle(preferences.mode)),
       h('div', { className: 'poly-actions' },
@@ -676,7 +679,7 @@ export function registerPolyViews(api: ValleyPluginApi, { t }: { t: (key: string
     return h('div', { className: 'poly-panel' },
       h(PanelHeader, { preferences }),
       h(Tabs, { preferences }),
-      preferences.mode === 'elink' ? h(elink.ElinkPanelBody, null) : preferences.mode === 'campus' ? h(CampusPanelBody, null) : preferences.mode === 'news' ? h(news.NewsPanelBody, null) : h(MenuPanel, { preferences }))
+      preferences.mode === 'elink' ? h(elink.ElinkPanelBody, null) : preferences.mode === 'campus' ? h(CampusPanelBody, null) : preferences.mode === 'news' ? h(news.NewsPanelBody, null) : preferences.mode === 'polybox' ? h(polybox.PolyboxPanelBody, null) : h(MenuPanel, { preferences }))
   }
 
   function Cards({ location, preferences, revision }: { location: Location; preferences: Preferences; revision: number }): Node {
@@ -753,7 +756,7 @@ export function registerPolyViews(api: ValleyPluginApi, { t }: { t: (key: string
   }
 
   api.registerView('poly.panel', Panel)
-  /** The page: the eLink timetable for instance `elink`, the campus map for a `campus` (or 2.0.0's `city`) instance, ETH News for `news` or `news:<article>`, else the menu plan. */
-  const Page = (props: { instanceId?: string }): Node => isElinkInstance(props.instanceId) ? h(elink.ElinkPage, props) : isCampusInstance(props.instanceId) ? h(CampusPage, null) : isNewsInstance(props.instanceId) ? h(news.NewsPage, props) : h(MenuPage, props)
+  /** The page: the eLink timetable for instance `elink`, the campus map for a `campus` (or 2.0.0's `city`) instance, ETH News for `news` or `news:<article>`, the Polybox table for `polybox`, else the menu plan. */
+  const Page = (props: { instanceId?: string }): Node => isElinkInstance(props.instanceId) ? h(elink.ElinkPage, props) : isCampusInstance(props.instanceId) ? h(CampusPage, null) : isNewsInstance(props.instanceId) ? h(news.NewsPage, props) : isPolyboxInstance(props.instanceId) ? h(polybox.PolyboxPage, props) : h(MenuPage, props)
   api.registerView('poly.page', Page)
 }

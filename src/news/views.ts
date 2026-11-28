@@ -7,7 +7,7 @@
  */
 import type { ValleyPluginApi } from '@valley/plugin-sdk'
 import { paletteCssContrast, paletteCssValue } from '@valley/plugin-sdk/palette'
-import { NEWS_FEEDS, NEWS_INSTANCE, articleInstance, articleOf, isArticleUrl, newsFeedOf, type Block, type Inline, type NewsArticle, type NewsEntry, type NewsFeed, type Picture } from './model'
+import { NEWS_FEEDS, NEWS_INSTANCE, articleInstance, articleOf, isArticleUrl, isSaved, newsSourceOf, savedArticle, savedEntry, savedOf, withSaved, withoutSaved, type Block, type Inline, type NewsArticle, type NewsEntry, type NewsFeed, type NewsSource, type Picture, type SavedArticle } from './model'
 
 type Shapes = string[]
 /** The News tab: a folded newspaper, its columns of text and the back page's edge. */
@@ -20,6 +20,9 @@ const FEED_ICONS: Record<NewsFeed, Shapes> = {
   media: ['M4 10v4a1 1 0 0 0 1 1h2.5L13 19V5L7.5 9H5a1 1 0 0 0-1 1z', 'M16.5 9a4 4 0 0 1 0 6', 'M19 6.5a7.5 7.5 0 0 1 0 11', 'M7.5 15l1 4.5']
 }
 const FEED_COLORS: Record<NewsFeed, string> = { news: 'palette:primary-blue', zukunftsblog: 'palette:orange', globe: 'palette:teal', media: 'palette:rose' }
+/** The Saved folder's glyph: a bookmark, outlined while an article is not saved and filled once it is. */
+export const BOOKMARK_ICON: Shapes = ['M7 3.5h10A1.5 1.5 0 0 1 18.5 5v15.5L12 16.3l-6.5 4.2V5A1.5 1.5 0 0 1 7 3.5z']
+const SAVED_COLOR = 'palette:violet'
 const SEARCH: Shapes = ['M10.5 4a6.5 6.5 0 1 0 0 13a6.5 6.5 0 1 0 0-13', 'M20 20l-4.8-4.8']
 const CLOSE: Shapes = ['M6 6l12 12', 'M18 6L6 18']
 const REFRESH: Shapes = ['M20 11a8 8 0 0 0-14.9-3.9L4 8.5', 'M4 4v4.5h4.5', 'M4 13a8 8 0 0 0 14.9 3.9l1.1-1.4', 'M20 20v-4.5h-4.5']
@@ -50,10 +53,11 @@ export const NEWS_CSS = `
 .news-tags-line .news-topic { box-sizing: border-box; height: 18px; max-width: 100%; line-height: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .news-card .news-tags-line { height: 40px; }
 @media (prefers-reduced-motion: reduce) { .news-row { transition: none; } }
-/* The four feed tags share the row equally so they always fit the sidebar (27 Nov: with counts they overflowed it). */
-.poly-bar.news-tags { overflow: hidden; }
-.news-tags .poly-tile { flex: 1 1 0; min-width: 0; justify-content: center; gap: 5px; padding: 0 5px; }
-.news-tags .poly-tile > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The four feed tags keep their glyph and full name at natural width; a narrow sidebar scrolls the row sideways (27 Nov, on request: "don't squish … make it x-scrollable"). */
+.news-tags .poly-tile { flex: 0 0 auto; justify-content: center; gap: 5px; padding: 0 9px; }
+/* Saved sits beside the tag button as an icon button; filled bookmark in its violet while open. */
+.news-search-bar .poly-icon-btn.saved-on { background: var(--accent-tint-bg); color: var(--news-saved-color); }
+.news-search-bar .poly-icon-btn.saved-on svg { fill: currentColor; }
 .poly-panel .poly-bar.news-search-bar { padding: 0 var(--space-2, 8px); }
 .news-search-bar .search-field-row { flex: 1; min-width: 0; }
 .news-search-bar { gap: 4px; }
@@ -62,6 +66,16 @@ export const NEWS_CSS = `
 .news-topic.on { background: var(--accent-tint-bg); color: var(--accent-color); }
 .news-topic:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 1px; }
 .poly-icon-btn.filtered:not(.active) { color: var(--accent-color); }
+/* Saved rows (27 Nov): drawn like the feed's rows, with the filled bookmark that removes one at the row's end. */
+.news-saved-item { position: relative; }
+.news-saved-item .news-tags-line { padding-right: 28px; }
+.news-saved-item > .news-unsave { position: absolute; right: 8px; bottom: 6px; }
+.news-unsave { display: flex; align-items: center; justify-content: center; width: var(--shell-control-toolbar, 24px); height: var(--shell-control-toolbar, 24px); padding: 0; border: 0; border-radius: var(--shell-control-radius, 4px); background: transparent; color: var(--accent-color); cursor: pointer; }
+.news-unsave:hover { background: var(--hover-bg); }
+.news-unsave svg { width: 15px; height: 15px; }
+.news-unsave:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -2px; }
+.poly-icon-btn.news-save.on { color: var(--accent-color); }
+.poly-page-head .poly-bar-balance.triple { width: calc(var(--shell-control-toolbar, 24px) * 3 + 16px); }
 /* The tag view: every tag of the feed as chips in place of the list; chosen ones in the accent tint. */
 .news-tag-view { padding: 10px 12px 4px; }
 .news-tag-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; color: var(--text-secondary); font-size: var(--small-font-size); }
@@ -184,7 +198,7 @@ export function createNewsViews(api: ValleyPluginApi, t: (key: string) => string
   type Node = ReturnType<typeof h>
   type State<T> = { data: T | null; error: string; loading: boolean }
 
-  const Icon = ({ shapes }: { shapes: Shapes }): Node => h('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true },
+  const Icon = ({ shapes, filled }: { shapes: Shapes; filled?: boolean }): Node => h('svg', { viewBox: '0 0 24 24', fill: filled ? 'currentColor' : 'none', stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true },
     ...shapes.map(d => h('path', { key: d, d })))
   const fill = (template: string, values: Record<string, string | number>) => Object.entries(values).reduce((text, [name, value]) => text.replace(`{${name}}`, String(value)), template)
   const problem = (error: unknown) => { const key = `news.error.${error instanceof Error ? error.message : ''}`; return t(key) === key ? t('news.error.serviceError') : t(key) }
@@ -212,7 +226,7 @@ export function createNewsViews(api: ValleyPluginApi, t: (key: string) => string
       return () => { for (const off of offs) off() }
     }, [])
     const settings = api.settings.get()
-    return { feed: newsFeedOf(settings.newsFeed), tags: newsTagsOf(settings.newsTags), language: language() }
+    return { source: newsSourceOf(settings.newsFeed), tags: newsTagsOf(settings.newsTags), saved: savedOf(settings.newsSaved), language: language() }
   }
   /** Adds or removes one tag of the sidebar's filter (hidden `newsTags` setting, shared by every surface). */
   const toggleTag = (tag: string) => {
@@ -252,6 +266,26 @@ export function createNewsViews(api: ValleyPluginApi, t: (key: string) => string
     void loadArticle(url, false).then(article => article.picture ? loadPicture(article.picture.src) : undefined).catch(() => undefined)
   }
 
+  /**
+   * Saves an article into the Saved folder (hidden `newsSaved` setting) with what its row needs offline, or
+   * takes it out. Without a known lead picture the article is read once and the picture added afterwards.
+   */
+  const savedList = () => savedOf(api.settings.get().newsSaved)
+  const save = (url: string) => {
+    const saved = savedArticle(url, { entry: entryCache.get(url), article: articleCache.get(url) }, new Date().toISOString())
+    if (!saved) return
+    void api.settings.set('newsSaved', withSaved(savedList(), saved))
+    if (saved.picture) return
+    void loadArticle(url, false).then(article => {
+      const list = savedList()
+      const current = list.find(item => item.url === url)
+      const filled = current && savedArticle(url, { entry: savedEntry(current), article }, current.savedAt)
+      if (filled?.picture) void api.settings.set('newsSaved', list.map(item => item.url === url ? filled : item))
+    }).catch(() => undefined)
+  }
+  const unsave = (url: string) => void api.settings.set('newsSaved', withoutSaved(savedList(), url))
+  const toggleSaved = (url: string) => isSaved(savedList(), url) ? unsave(url) : save(url)
+
   function useAnswer<T>(key: string | null, revision: number, load: (fresh: boolean) => Promise<T>, cache?: Map<string, T>): State<T> {
     const cached = key !== null && revision === 0 ? cache?.get(key) : undefined
     const [state, setState] = React.useState<State<T> & { key: string | null }>(() => cached !== undefined ? { key, data: cached, error: '', loading: false } : { key: null, data: null, error: '', loading: key !== null })
@@ -284,8 +318,12 @@ export function createNewsViews(api: ValleyPluginApi, t: (key: string) => string
     return { revision, refreshing, refresh }
   }
 
-  const useFeed = (feed: NewsFeed, lang: 'de' | 'en', revision: number) =>
-    useAnswer<NewsEntry[]>(`${lang}:${feed}`, revision, fresh => loadFeed(feed, lang, fresh), feedCache)
+  /** The chosen source's entries: a feed read from ethz.ch, or the Saved folder straight from settings. */
+  function useSource(source: NewsSource, saved: SavedArticle[], lang: 'de' | 'en', revision: number): State<NewsEntry[]> {
+    const feed = source === 'saved' ? null : source
+    const state = useAnswer<NewsEntry[]>(feed ? `${lang}:${feed}` : null, revision, fresh => loadFeed(feed!, lang, fresh), feedCache)
+    return feed ? state : { data: saved.map(savedEntry), error: '', loading: false }
+  }
   /** Every feed's entries for the tag counts; the chosen feed is asked first. */
   function useFeeds(chosen: NewsFeed, lang: 'de' | 'en', revision: number) {
     const known = (): Partial<Record<NewsFeed, NewsEntry[]>> => Object.fromEntries(NEWS_FEEDS.flatMap(feed => feedCache.has(`${lang}:${feed}`) ? [[feed, feedCache.get(`${lang}:${feed}`)!]] : []))
@@ -333,15 +371,19 @@ export function createNewsViews(api: ValleyPluginApi, t: (key: string) => string
   /** An ETH News article opens in Valley; any other address goes to Valley's link handling. */
   const follow = (href: string, label: string, newTab = false) => isArticleUrl(href) ? openArticle(href, label, newTab) : void api.links.open(href)
 
-  const articleMenu = async (event: MouseEvent, entry: { url: string; title: string }, refresh?: () => void) => {
+  const articleMenu = async (event: MouseEvent, entry: NewsEntry, refresh?: () => void) => {
     event.preventDefault()
+    const saved = isSaved(savedList(), entry.url)
     const choice = await api.ui.openMenu([
       { id: 'tab', label: t('openInNewTab'), icon: h(Icon, { shapes: TAB }) },
       { id: 'website', label: t('news.openWebsite'), icon: h(Icon, { shapes: OPEN }) },
+      { type: 'separator' as const },
+      { id: 'save', label: t(saved ? 'news.saved.remove' : 'news.saved.add'), icon: h(Icon, { shapes: BOOKMARK_ICON, filled: !saved }) },
       ...(refresh ? [{ type: 'separator' as const }, { id: 'refresh', label: t('refresh'), icon: h(Icon, { shapes: REFRESH }) }] : [])
     ], { x: event.clientX, y: event.clientY })
     if (choice === 'tab') openArticle(entry.url, entry.title, true)
     if (choice === 'website') void api.links.open(entry.url)
+    if (choice === 'save') { keep(entryCache, entry.url, entryCache.get(entry.url) ?? entry, 1000); toggleSaved(entry.url) }
     if (choice === 'refresh') refresh?.()
   }
   const clickProps = (entry: NewsEntry, refresh?: () => void) => ({
@@ -353,9 +395,11 @@ export function createNewsViews(api: ValleyPluginApi, t: (key: string) => string
   })
 
   /** Row 3: the four feeds as tags, each with its glyph and colour; the tooltip counts the articles from the last seven days. */
-  function FeedTags({ chosen, byFeed }: { chosen: NewsFeed; byFeed: Partial<Record<NewsFeed, NewsEntry[]>> }): Node {
+  function FeedTags({ chosen, byFeed }: { chosen: NewsSource; byFeed: Partial<Record<NewsFeed, NewsEntry[]>> }): Node {
     const now = Date.now()
-    return h('nav', { className: 'poly-bar poly-tiles news-tags', 'aria-label': t('news.feeds') }, NEWS_FEEDS.map(feed => {
+    // A plain mouse wheel scrolls the row sideways too.
+    const wheel = (event: WheelEvent) => { const row = event.currentTarget as HTMLElement; if (row.scrollWidth > row.clientWidth && Math.abs(event.deltaY) > Math.abs(event.deltaX)) row.scrollLeft += event.deltaY }
+    return h('nav', { className: 'poly-bar poly-tiles news-tags', 'aria-label': t('news.feeds'), onWheel: wheel }, ...NEWS_FEEDS.map(feed => {
       const entries = byFeed[feed]
       const recent = entries ? entries.filter(entry => isRecent(entry.published, now)).length : null
       const title = recent === null ? feedTitle(feed) : `${feedTitle(feed)} · ${recent === 1 ? t('news.recent.one') : fill(t('news.recent.other'), { count: recent })}`
@@ -401,7 +445,17 @@ export function createNewsViews(api: ValleyPluginApi, t: (key: string) => string
         : h('div', { className: 'poly-note' }, query ? t('news.tags.noMatch') : t('news.tags.none')))
   }
 
-  function SearchRow({ query, setQuery, tagView, chosen, toggleTags }: { query: string; setQuery: (value: string) => void; tagView: boolean; chosen: string[]; toggleTags: () => void }): Node {
+  /** Saved beside the tag button: opens the Saved folder, and a second click goes back to ETH News. */
+  function SavedButton({ open, count }: { open: boolean; count: number }): Node {
+    const label = `${t('news.saved.title')} · ${count === 1 ? t('news.tags.articles.one') : fill(t('news.tags.articles.other'), { count })}`
+    return h('button', {
+      type: 'button', className: `poly-icon-btn${open ? ' saved-on' : ''}`, title: label, 'aria-label': label, 'aria-pressed': open, 'data-feed': 'saved',
+      style: { '--news-saved-color': paletteCssValue(SAVED_COLOR) } as Record<string, string>,
+      onClick: () => void api.settings.set('newsFeed', open ? 'news' : 'saved')
+    }, h(Icon, { shapes: BOOKMARK_ICON }))
+  }
+
+  function SearchRow({ query, setQuery, tagView, chosen, toggleTags, savedOpen, savedCount }: { query: string; setQuery: (value: string) => void; tagView: boolean; chosen: string[]; toggleTags: () => void; savedOpen: boolean; savedCount: number }): Node {
     const placeholder = t(tagView ? 'news.tags.search' : 'news.search')
     return h('div', { className: 'poly-bar news-search-bar' },
       h('div', { className: 'search-field-row' },
@@ -409,7 +463,8 @@ export function createNewsViews(api: ValleyPluginApi, t: (key: string) => string
           h('span', { className: 'search-field-icon' }, h(Icon, { shapes: SEARCH })),
           h('input', { className: 'search-field-input', value: query, placeholder, 'aria-label': placeholder, onChange: (event: { target: HTMLInputElement }) => setQuery(event.target.value), onKeyDown: (event: KeyboardEvent) => { if (event.key === 'Escape') setQuery('') } }),
           query ? h('button', { type: 'button', className: 'search-field-action', title: t('news.search.clear'), 'aria-label': t('news.search.clear'), onClick: () => setQuery('') }, h(Icon, { shapes: CLOSE })) : null)),
-      h(TagButton, { open: tagView, chosen, toggle: toggleTags }))
+      h(TagButton, { open: tagView, chosen, toggle: toggleTags }),
+      h(SavedButton, { open: savedOpen, count: savedCount }))
   }
 
   /**
@@ -436,6 +491,13 @@ export function createNewsViews(api: ValleyPluginApi, t: (key: string) => string
       h(Tags, { topics: entry.topics, line: true, chosen }))
   }
 
+  /** A row of the Saved folder: the feed's row with the filled bookmark that takes it out of the folder. */
+  function SavedRow(props: { entry: NewsEntry; active: boolean; refresh: () => void; chosen: string[] }): Node {
+    const label = fill(t('news.saved.removeOne'), { title: props.entry.title })
+    return h('div', { className: 'news-saved-item' }, h(Row, props),
+      h('button', { type: 'button', className: 'news-unsave', title: label, 'aria-label': label, onClick: () => unsave(props.entry.url) }, h(Icon, { shapes: BOOKMARK_ICON, filled: true })))
+  }
+
   /** Quiet rows in the list's shape while a feed is read the first time; shown only when that takes long. */
   function RowPlaceholders(): Node | null {
     const late = useLate()
@@ -447,35 +509,36 @@ export function createNewsViews(api: ValleyPluginApi, t: (key: string) => string
 
   /** The sidebar's News tab below the tab row: the feed tags, the search, then the articles. */
   function NewsPanelBody(): Node {
-    const { feed, tags, language: lang } = usePreferences()
+    const { source, tags, saved, language: lang } = usePreferences()
     const { revision, refresh } = useRefresh()
     const [query, setQuery] = React.useState('')
     const [tagView, setTagView] = React.useState(false)
     // Each view keeps its own search: articles here, tag names in the tag view.
     const [tagQuery, setTagQuery] = React.useState('')
-    const byFeed = useFeeds(feed, lang, revision)
-    const state = useFeed(feed, lang, revision)
+    const byFeed = useFeeds(source === 'saved' ? 'news' : source, lang, revision)
+    const state = useSource(source, saved, lang, revision)
     const open = useActiveInstance()
     const entries = state.data ?? []
     const listed = searchEntries(withTags(entries, tags), query)
-    const empty = query ? t('news.empty.search') : tags.length ? t('news.empty.tags') : t('news.empty')
+    const empty = query ? t('news.empty.search') : tags.length ? t('news.empty.tags') : source === 'saved' ? t('news.saved.empty') : t('news.empty')
     const body = state.error ? h('div', { className: 'poly-note error', role: 'alert' }, state.error)
       : !state.data ? h(RowPlaceholders, null)
       : tagView ? h(TagView, { entries, chosen: tags, query: tagQuery })
       : !listed.length ? h('div', { className: 'poly-note' }, empty, tags.length ? h(React.Fragment, null, ' ', h('button', { type: 'button', className: 'news-text-btn', onClick: clearTags }, t('news.tags.clear'))) : null)
-      : h('div', { className: 'news-appear' }, ...listed.map(entry => h(Row, { key: entry.id, entry, active: open === articleInstance(entry.url), refresh, chosen: tags })))
+      : h('div', { className: 'news-appear' }, ...listed.map(entry => h(source === 'saved' ? SavedRow : Row, { key: entry.id, entry, active: open === articleInstance(entry.url), refresh, chosen: tags })))
     return h(React.Fragment, null,
-      h(FeedTags, { chosen: feed, byFeed }),
-      h(SearchRow, { query: tagView ? tagQuery : query, setQuery: tagView ? setTagQuery : setQuery, tagView, chosen: tags, toggleTags: () => setTagView(value => !value) }),
+      h(FeedTags, { chosen: source, byFeed }),
+      h(SearchRow, { query: tagView ? tagQuery : query, setQuery: tagView ? setTagQuery : setQuery, tagView, chosen: tags, toggleTags: () => setTagView(value => !value), savedOpen: source === 'saved', savedCount: saved.length }),
       h('div', { className: 'news-list' }, body, h('div', { className: 'poly-credit' }, t('news.credit'))))
   }
 
   /** A feed card: the article's picture (read from its page once the card is on screen), topic, date, title, summary, author. */
-  function Card({ entry, active, revision, chosen }: { entry: NewsEntry; active: boolean; revision: number; chosen: string[] }): Node {
+  function Card({ entry, active, revision, chosen, stored = '' }: { entry: NewsEntry; active: boolean; revision: number; chosen: string[]; stored?: string }): Node {
     const ref = React.useRef<HTMLButtonElement>(null)
     const visible = useVisible(ref)
-    const article = useAnswer<NewsArticle>(visible ? entry.url : null, revision, fresh => loadArticle(entry.url, fresh), articleCache)
-    const picture = usePicture(article.data?.picture?.src ?? null)
+    // A saved card keeps its lead picture's address, so only the picture is read, not the article.
+    const article = useAnswer<NewsArticle>(visible && !stored ? entry.url : null, revision, fresh => loadArticle(entry.url, fresh), articleCache)
+    const picture = usePicture(stored ? (visible ? stored : null) : article.data?.picture?.src ?? null)
     return h('button', { ref, type: 'button', className: `news-card${active ? ' active' : ''}`, 'data-article': entry.url, ...clickProps(entry) },
       h('span', { className: 'news-card-image' }, h(Icon, { shapes: NEWS_ICON }), picture.data ? h('img', { src: picture.data, alt: article.data?.picture?.alt ?? '', draggable: false }) : null),
       h('span', { className: 'news-card-body' },
@@ -496,24 +559,25 @@ export function createNewsViews(api: ValleyPluginApi, t: (key: string) => string
   }
 
   const PageHead = ({ title, actions }: { title: string; actions: Node[] }): Node => h('div', { className: 'poly-bar poly-page-head' },
-    h('span', { className: `poly-bar-balance${actions.length > 1 ? ' double' : ''}`, 'aria-hidden': true }),
+    h('span', { className: `poly-bar-balance${actions.length > 2 ? ' triple' : actions.length > 1 ? ' double' : ''}`, 'aria-hidden': true }),
     h('h1', { className: 'poly-page-title' }, title),
     ...actions)
   const refreshButton = (refreshing: boolean, refresh: () => void) => h('button', { key: 'refresh', type: 'button', className: `poly-icon-btn${refreshing ? ' spinning' : ''}`, title: t('refresh'), 'aria-label': t('refresh'), onClick: refresh }, h(Icon, { shapes: REFRESH }))
 
   /** The chosen feed's articles as cards; its name stands in the first bar, the sidebar picks the feed. */
   function FeedPage({ instanceId }: { instanceId?: string }): Node {
-    const { feed, tags, language: lang } = usePreferences()
+    const { source, tags, saved, language: lang } = usePreferences()
     const { revision, refreshing, refresh } = useRefresh()
-    const state = useFeed(feed, lang, revision)
+    const state = useSource(source, saved, lang, revision)
     const open = useActiveInstance()
     React.useEffect(() => { api.workspace.setMainTabTitle(t('news.title'), instanceId) }, [instanceId, api.ui.language()])
+    const pictures = new Map(saved.map(item => [item.url, item.picture]))
     const content = state.error ? h('div', { className: 'poly-note error', role: 'alert' }, state.error)
       : !state.data ? h(CardPlaceholders, null)
-      : !state.data.length ? h('div', { className: 'poly-note' }, t('news.empty'))
-      : h('div', { className: 'news-cards news-appear' }, state.data.map(entry => h(Card, { key: entry.id, entry, active: open === articleInstance(entry.url), revision, chosen: tags })))
+      : !state.data.length ? h('div', { className: 'poly-note' }, t(source === 'saved' ? 'news.saved.empty' : 'news.empty'))
+      : h('div', { className: 'news-cards news-appear' }, state.data.map(entry => h(Card, { key: entry.id, entry, active: open === articleInstance(entry.url), revision, chosen: tags, stored: source === 'saved' ? pictures.get(entry.url) : undefined })))
     return h('div', { className: 'poly-page' },
-      h(PageHead, { title: feedTitle(feed), actions: [refreshButton(refreshing, refresh)] }),
+      h(PageHead, { title: source === 'saved' ? t('news.saved.title') : feedTitle(source), actions: [refreshButton(refreshing, refresh)] }),
       h('div', { className: 'poly-list' }, h('div', { className: 'poly-page-inner' }, content, h('div', { className: 'poly-credit' }, t('news.credit')))))
   }
 
@@ -569,14 +633,20 @@ export function createNewsViews(api: ValleyPluginApi, t: (key: string) => string
   /** One article read in Valley: its first bar names ETH News and opens the original page; the text below scrolls. */
   function ArticlePage({ instanceId, url }: { instanceId?: string; url: string }): Node {
     const { revision, refreshing, refresh } = useRefresh()
-    const { tags } = usePreferences()
+    const { tags, saved } = usePreferences()
     const state = useAnswer<NewsArticle>(url, revision, fresh => loadArticle(url, fresh), articleCache)
     const article = state.data
-    const entry = entryCache.get(url)
+    // A saved article opens from what was saved too, also once it has left the feed.
+    const kept = saved.find(item => item.url === url)
+    const entry = entryCache.get(url) ?? (kept ? savedEntry(kept) : undefined)
     const late = useLate()
     // What the feed already said stands at once; the page's own text replaces it when it arrives.
     const head = article ?? (entry ? { title: entry.title, lead: entry.summary, date: entry.published, author: entry.author, topics: entry.topics, picture: null } : null)
     React.useEffect(() => { api.workspace.setMainTabTitle(head?.title || t('news.title'), instanceId) }, [instanceId, head?.title, api.ui.language()])
+    const on = isSaved(saved, url)
+    const saveLabel = t(on ? 'news.saved.remove' : 'news.saved.add')
+    // Saving needs a title: the feed's entry, or the page once read.
+    const bookmark = h('button', { key: 'save', type: 'button', className: `poly-icon-btn news-save${on ? ' on' : ''}`, title: saveLabel, 'aria-label': saveLabel, 'aria-pressed': on, disabled: !on && !head, onClick: () => toggleSaved(url) }, h(Icon, { shapes: BOOKMARK_ICON, filled: on }))
     const website = h('button', { key: 'website', type: 'button', className: 'poly-icon-btn', title: t('news.openWebsite'), 'aria-label': t('news.openWebsite'), onClick: () => void api.links.open(url) }, h(Icon, { shapes: OPEN }))
     const content = !head && state.error ? h('div', { className: 'poly-note error', role: 'alert' }, state.error)
       : !head ? (late ? h('div', { className: 'news-article', 'aria-busy': true, 'aria-label': t('news.loading') }, h('div', { className: 'news-placeholder' }, h('span', { className: 'news-bar heading' }), h('span', { className: 'news-bar text' }), h('span', { className: 'news-bar text' }), h('span', { className: 'news-bar short' }))) : null)
@@ -593,7 +663,7 @@ export function createNewsViews(api: ValleyPluginApi, t: (key: string) => string
               h('a', { className: 'news-inline-link', href: url, onClick: (event: MouseEvent) => { event.preventDefault(); void api.links.open(url) } }, new URL(url).host)))
           : h('div', { className: 'news-figure' }, h('div', { className: 'news-figure-frame empty' })))
     return h('div', { className: 'poly-page' },
-      h(PageHead, { title: t('news.title'), actions: [website, refreshButton(refreshing, refresh)] }),
+      h(PageHead, { title: t('news.title'), actions: [bookmark, website, refreshButton(refreshing, refresh)] }),
       h('div', { className: 'poly-list' }, content))
   }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { articleInstance, articleOf, decodeEntities, feedUrl, isArticleUrl, isNewsImageUrl, isNewsInstance, newsFeedOf, parseArticle, parseFeed } from '../src/news/model'
+import { MAX_SAVED, articleInstance, articleOf, decodeEntities, feedUrl, isArticleUrl, isNewsImageUrl, isNewsInstance, isSaved, newsFeedOf, newsSourceOf, parseArticle, parseFeed, savedArticle, savedEntry, savedOf, withSaved, withoutSaved } from '../src/news/model'
 import { ARTICLE_HTML, ARTICLE_URL, BLOG_HTML, FEED, OLD_URL, SECOND_URL } from './news-fixtures'
 
 describe('ETH News model', () => {
@@ -73,5 +73,33 @@ describe('ETH News model', () => {
     expect(article.picture).toEqual({ src: 'https://ethz.ch/en/news-and-events/eth-news/news/2025/03/glacier-sensors/_jcr_content/pageimages/imageCarousel.imageformat.lightbox.9.jpg', alt: 'Ice', caption: '' })
     expect(article.blocks).toEqual([{ type: 'paragraph', parts: [{ text: 'The ice is never still.' }] }])
     expect(parseArticle('<html><body><p>No heading</p></body></html>', OLD_URL)).toBeNull()
+  })
+
+  it('keeps saved articles within the setting\'s schema, newest saved first, each once', () => {
+    const [entry, second] = parseFeed(FEED)
+    const article = parseArticle(ARTICLE_HTML, ARTICLE_URL)
+    const saved = savedArticle(ARTICLE_URL, { entry, article }, '2026-11-27T10:00:00.000Z')!
+    expect(saved).toEqual({ url: ARTICLE_URL, title: entry.title, summary: entry.summary, published: entry.published, author: entry.author, topics: entry.topics, picture: article!.picture!.src, savedAt: '2026-11-27T10:00:00.000Z' })
+    // Without the feed's entry the page says it all; without either there is nothing to save.
+    expect(savedArticle(ARTICLE_URL, { article }, 'x')).toMatchObject({ title: 'A quieter wind tunnel', summary: article!.lead })
+    expect(savedArticle(ARTICLE_URL, {}, 'x')).toBeNull()
+    expect(savedArticle('https://example.org/a.html', { entry }, 'x')).toBeNull()
+    const other = savedArticle(SECOND_URL, { entry: second }, '2026-11-27T11:00:00.000Z')!
+    expect(other.picture).toBe('')
+    const list = withSaved(withSaved([], saved), other)
+    expect(list.map(item => item.url)).toEqual([SECOND_URL, ARTICLE_URL])
+    expect(withSaved(list, { ...saved, savedAt: '2026-11-27T12:00:00.000Z' }).map(item => item.url)).toEqual([ARTICLE_URL, SECOND_URL])
+    expect(isSaved(list, ARTICLE_URL)).toBe(true)
+    expect(withoutSaved(list, ARTICLE_URL).map(item => item.url)).toEqual([SECOND_URL])
+    expect(savedEntry(saved)).toEqual({ ...entry, id: ARTICLE_URL })
+    // The stored list is read back sorted and cleaned: foreign addresses, duplicates and pictures from elsewhere go.
+    expect(savedOf([saved, other, { ...saved, title: 'Again' }, { url: 'https://example.org/x.html', title: 'X' }, 3, null, { ...other, url: OLD_URL, picture: 'https://example.org/p.jpg', topics: ['a', 'a', 4], savedAt: '' }]))
+      .toEqual([other, saved, { ...other, url: OLD_URL, picture: '', topics: ['a'], savedAt: '' }])
+    expect(savedOf('nonsense')).toEqual([])
+    const many = Array.from({ length: MAX_SAVED + 3 }, (_, index) => ({ ...saved, url: ARTICLE_URL.replace('.html', `-${index}.html`) }))
+    expect(many.reduce((all, item) => withSaved(all, item), [] as typeof many)).toHaveLength(MAX_SAVED)
+    expect(newsSourceOf('saved')).toBe('saved')
+    expect(newsSourceOf('globe')).toBe('globe')
+    expect(newsSourceOf('nope')).toBe('news')
   })
 })

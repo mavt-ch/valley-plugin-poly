@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { createMockValleyApi } from '@valley/plugin-testkit'
 import { createNewsViews, isRecent, newsTagsOf, searchEntries, tagCounts, withTags } from '../src/news/views'
-import { articleInstance, parseArticle, parseFeed } from '../src/news/model'
-import { ARTICLE_HTML, ARTICLE_URL, FEED, SECOND_URL } from './news-fixtures'
+import { articleInstance, parseArticle, parseFeed, savedArticle, type SavedArticle } from '../src/news/model'
+import { ARTICLE_HTML, ARTICLE_URL, FEED, OLD_URL, SECOND_URL } from './news-fixtures'
 import en from '../locales/en.json'
 
 const t = (key: string) => (en as Record<string, string>)[key] ?? key
@@ -31,9 +31,13 @@ function harness(view: 'panel' | 'page', instanceId?: string, settings: Record<s
   api.workspace.setMainTabTitle = vi.fn() as unknown as typeof api.workspace.setMainTabTitle
   const open = vi.fn(async () => ({ ok: true }))
   api.links.open = open as unknown as typeof api.links.open
+  const menus: { id?: string; label?: string }[][] = []
+  let menuChoice: string | null = null
+  api.ui.openMenu = vi.fn(async (items: { id?: string; label?: string }[]) => { menus.push(items); return menuChoice }) as unknown as typeof api.ui.openMenu
+  const choose = (id: string | null) => { menuChoice = id }
   const views = createNewsViews(api, t)
   const { container } = render(api.React.createElement(view === 'panel' ? views.NewsPanelBody : views.NewsPage, { instanceId }))
-  return { calls, settings, openMainTab, open, container, api, views }
+  return { calls, settings, openMainTab, open, container, api, views, menus, choose }
 }
 
 afterEach(() => { cleanup(); vi.useRealTimers() })
@@ -47,6 +51,10 @@ describe('ETH News views', () => {
     const tags = [...container.querySelectorAll('.poly-tile')]
     expect(tags.map(tag => [tag.getAttribute('data-feed'), tag.textContent, tag.getAttribute('title')])).toEqual([['news', 'News', 'ETH News · 2 articles this week'], ['zukunftsblog', 'Blog', 'Zukunftsblog · 2 articles this week'], ['globe', 'Globe', 'Globe magazine · 0 articles this week'], ['media', 'Media', 'Media releases · 2 articles this week']])
     expect(tags[0].getAttribute('aria-pressed')).toBe('true')
+    // Saved sits beside the tag button, after the search field.
+    const savedButton = container.querySelector('.news-search-bar [data-feed="saved"]')!
+    expect(savedButton.getAttribute('title')).toBe('Saved · 0 articles')
+    expect(savedButton.previousElementSibling?.hasAttribute('data-tag-view')).toBe(true)
     const rows = [...container.querySelectorAll('.news-row')]
     expect(rows.map(row => row.querySelector('.news-row-title')?.textContent)).toEqual(['A quieter wind tunnel for the Hönggerberg\'s labs', 'Student rover wins the desert challenge', 'Sensors listen to a glacier'])
     expect(rows[0].querySelector('.news-row-date')?.textContent).toBe('Today')
@@ -180,5 +188,116 @@ describe('ETH News views', () => {
     expect(isRecent('2026-11-21T13:00:00Z', now)).toBe(true)
     expect(isRecent('2026-11-20T11:00:00Z', now)).toBe(false)
     expect(isRecent('nonsense', now)).toBe(false)
+  })
+
+  describe('the Saved folder', () => {
+    const GONE_URL = 'https://ethz.ch/en/news-and-events/eth-news/news/2024/01/an-old-story.html'
+    const PICTURE = 'https://ethz.ch/en/news-and-events/eth-news/news/2024/01/an-old-story/_jcr_content/articleLeadImage/image.imageformat.carousel.1.jpg'
+    const savedList = (): SavedArticle[] => [
+      { url: SECOND_URL, title: 'Student rover wins the desert challenge', summary: 'A rover built by students.', published: '2026-11-26T08:00:00Z', author: 'ETH News', topics: ['Students'], picture: '', savedAt: '2026-11-27T09:00:00.000Z' },
+      { url: GONE_URL, title: 'A story the feed no longer lists', summary: 'Kept without the network.', published: '2024-01-10T08:00:00Z', author: 'Jane Example', topics: ['Archive', 'Research'], picture: PICTURE, savedAt: '2026-11-27T11:00:00.000Z' }
+    ]
+
+    it('saves and removes an article with the bookmark on its page\'s bar', async () => {
+      const { container, settings } = harness('page', articleInstance(ARTICLE_URL))
+      await settle()
+      const button = () => container.querySelector('.poly-page-head .news-save')!
+      expect(button().getAttribute('aria-label')).toBe('Save')
+      expect(button().getAttribute('aria-pressed')).toBe('false')
+      expect(button().querySelector('svg')?.getAttribute('fill')).toBe('none')
+      expect(container.querySelector('.poly-page-head .poly-bar-balance')?.className).toContain('triple')
+      fireEvent.click(button())
+      await settle()
+      const article = parseArticle(ARTICLE_HTML, ARTICLE_URL)!
+      expect(settings.newsSaved).toEqual([{ url: ARTICLE_URL, title: article.title, summary: article.lead, published: article.date, author: article.author, topics: article.topics, picture: article.picture!.src, savedAt: '2026-11-27T12:00:00.000Z' }])
+      expect(button().getAttribute('aria-pressed')).toBe('true')
+      expect(button().getAttribute('aria-label')).toBe('Remove from Saved')
+      expect(button().querySelector('svg')?.getAttribute('fill')).toBe('currentColor')
+      fireEvent.click(button())
+      await settle()
+      expect(settings.newsSaved).toEqual([])
+    })
+
+    it('saves from a row\'s right-click menu with the feed\'s text, then adds the lead picture once read', async () => {
+      const { container, settings, menus, choose } = harness('panel')
+      await settle()
+      choose('save')
+      fireEvent.contextMenu(container.querySelector(`[data-article="${ARTICLE_URL}"]`)!)
+      await settle()
+      expect(menus.at(-1)?.map(item => item.label)).toContain('Save')
+      const entry = parseFeed(FEED)[0]
+      expect(settings.newsSaved).toEqual([{ ...savedArticle(ARTICLE_URL, { entry }, '2026-11-27T12:00:00.000Z')!, picture: parseArticle(ARTICLE_HTML, ARTICLE_URL)!.picture!.src }])
+      choose(null)
+      fireEvent.contextMenu(container.querySelector(`[data-article="${ARTICLE_URL}"]`)!)
+      await settle()
+      expect(menus.at(-1)?.map(item => item.label)).toContain('Remove from Saved')
+    })
+
+    it('opens from the bookmark beside the tag button and lists the saved articles like feed rows, newest saved first', async () => {
+      const { container, settings, openMainTab, menus, choose } = harness('panel', undefined, { newsFeed: 'saved', newsSaved: savedList() })
+      await settle()
+      const tiles = [...container.querySelectorAll('.poly-tile')]
+      expect(tiles.map(tile => tile.getAttribute('data-feed'))).toEqual(['news', 'zukunftsblog', 'globe', 'media'])
+      expect(tiles.every(tile => tile.getAttribute('aria-pressed') === 'false')).toBe(true)
+      const savedButton = container.querySelector('.news-search-bar [data-feed="saved"]')!
+      expect(savedButton.getAttribute('title')).toBe('Saved · 2 articles')
+      expect(savedButton.getAttribute('aria-pressed')).toBe('true')
+      const rows = () => [...container.querySelectorAll('.news-saved-item .news-row')]
+      expect(rows().map(row => row.getAttribute('data-article'))).toEqual([GONE_URL, SECOND_URL])
+      expect([...rows()[0].children].map(child => child.className)).toEqual(['news-row-title', 'news-row-date', 'news-row-summary', 'news-tags-line'])
+      expect([...rows()[0].querySelectorAll('.news-topic')].map(tag => tag.textContent)).toEqual(['Archive', 'Research'])
+      // A click opens the saved article in Valley, even one the feed no longer lists.
+      fireEvent.click(rows()[0])
+      expect(openMainTab).toHaveBeenLastCalledWith({ instanceId: articleInstance(GONE_URL), title: 'A story the feed no longer lists', newTab: false })
+      // The search and the tag view work on the folder too.
+      fireEvent.change(container.querySelector('.search-field-input')!, { target: { value: 'rover' } })
+      expect(rows().map(row => row.getAttribute('data-article'))).toEqual([SECOND_URL])
+      fireEvent.change(container.querySelector('.search-field-input')!, { target: { value: '' } })
+      fireEvent.click(container.querySelector('.news-search-bar [data-tag-view]')!)
+      await settle()
+      expect([...container.querySelectorAll('.news-cloud .news-topic')].map(chip => chip.getAttribute('data-tag'))).toEqual(['Archive', 'Research', 'Students'])
+      fireEvent.click(container.querySelector('.news-cloud [data-tag="Students"]')!)
+      fireEvent.click(container.querySelector('.news-search-bar [data-tag-view]')!)
+      await settle()
+      expect(rows().map(row => row.getAttribute('data-article'))).toEqual([SECOND_URL])
+      fireEvent.click(rows()[0].querySelector('.news-topic.on')!)
+      await settle()
+      expect(settings.newsTags).toEqual([])
+      // The filled bookmark removes one; the right-click menu offers Remove too.
+      fireEvent.click(container.querySelector(`.news-saved-item:has([data-article="${GONE_URL}"]) .news-unsave`)!)
+      await settle()
+      expect((settings.newsSaved as SavedArticle[]).map(item => item.url)).toEqual([SECOND_URL])
+      choose('save')
+      fireEvent.contextMenu(rows()[0])
+      await settle()
+      expect(menus.at(-1)?.map(item => item.label)).toContain('Remove from Saved')
+      expect(settings.newsSaved).toEqual([])
+      expect(container.querySelector('.news-search-bar [data-feed="saved"]')).not.toBeNull()
+      expect(container.querySelector('.poly-note')?.textContent).toBe('No saved articles yet. An article is saved with the bookmark on its page or from its right-click menu.')
+      // A second click on the bookmark goes back to ETH News.
+      fireEvent.click(container.querySelector('.news-search-bar [data-feed="saved"]')!)
+      await settle()
+      expect(settings.newsFeed).toBe('news')
+    })
+
+    it('shows the folder as picture cards on the page, the pictures from what was saved', async () => {
+      const { container, calls } = harness('page', 'news', { newsFeed: 'saved', newsSaved: savedList() })
+      await settle()
+      expect(container.querySelector('.poly-page-title')?.textContent).toBe('Saved')
+      const cards = [...container.querySelectorAll('.news-card')]
+      expect(cards.map(card => card.getAttribute('data-article'))).toEqual([GONE_URL, SECOND_URL])
+      expect(calls.some(([name, input]) => name === 'image' && input.url === PICTURE)).toBe(true)
+      expect(calls.some(([name, input]) => name === 'news.article' && input.url === GONE_URL)).toBe(false)
+      expect(calls.some(([name]) => name === 'news.feed')).toBe(false)
+      expect(cards[0].querySelector('img')?.getAttribute('src')).toBe('data:image/png;base64,AA==')
+      expect([...cards[0].querySelector('.news-card-body')!.children].map(child => child.className)).toEqual(['news-card-top', 'news-card-title', 'news-card-summary', 'news-tags-line'])
+    })
+
+    it('opens a saved article at once from what was saved', async () => {
+      const { container } = harness('page', articleInstance(OLD_URL), { newsSaved: [{ ...savedList()[1], url: OLD_URL, title: 'Saved title' }] })
+      expect(container.querySelector('.news-title')?.textContent).toBe('Saved title')
+      expect(container.querySelector('.news-save')?.getAttribute('aria-pressed')).toBe('true')
+      await settle()
+    })
   })
 })

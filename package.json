@@ -1,6 +1,6 @@
 {
   "name": "@valley/plugin-poly",
-  "version": "2.8.0",
+  "version": "2.9.0",
   "license": "MIT",
   "private": true,
   "type": "module",
@@ -26,7 +26,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@types/three": "0.186.0",
-    "@valley/plugin-sdk": "file:vendor/valley-plugin-sdk-8.7.2.tgz",
+    "@valley/plugin-sdk": "file:vendor/valley-plugin-sdk-8.9.0.tgz",
     "@valley/plugin-testkit": "file:vendor/valley-plugin-testkit-8.7.2.tgz",
     "@valley/plugin-tools": "file:vendor/valley-plugin-tools-6.1.0.tgz",
     "earcut": "3.0.2",
