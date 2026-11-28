@@ -4,7 +4,8 @@ import { decodeEntities } from '../news/model'
 export type PolyboxLink = { name: string; url: string }
 
 /** One file or folder of a share, as the backend lists it. */
-export type PolyboxFile = { name: string; path: string; isFolder: boolean; size?: number; modified?: string; type?: string; url: string }
+/** `created` is when the file was added to Polybox (Nextcloud's upload time); folders and older files have none. */
+export type PolyboxFile = { name: string; path: string; isFolder: boolean; size?: number; created?: string; modified?: string; type?: string; url: string }
 
 export const POLYBOX_INSTANCE = 'polybox'
 const TOKEN = /^[A-Za-z0-9]{6,64}$/
@@ -29,9 +30,31 @@ export const POLYBOX_DATA = 'plugins/data/poly/polybox'
 /** Where a share's file is kept inside `POLYBOX_DATA`: `<token>/<path inside the share>`, every segment a safe file name. */
 export const keptPath = (token: string, path: string) => [token, ...path.split('/').filter(Boolean).map(realmSegment)].join('/')
 
-/** Folders first, then files, each by name as people sort (Serie 2 before Serie 10). */
-export function sortFiles(files: PolyboxFile[]): PolyboxFile[] {
-  return [...files].sort((a, b) => Number(b.isFolder) - Number(a.isFolder) || a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }))
+export type SortKey = 'name' | 'created' | 'modified' | 'size'
+export type FileSort = { key: SortKey; dir: 'asc' | 'desc' }
+export const DEFAULT_SORT: FileSort = { key: 'name', dir: 'asc' }
+const SORT_KEYS: SortKey[] = ['name', 'created', 'modified', 'size']
+/** The saved column sort, else name ascending. */
+export function sortOf(value: unknown): FileSort {
+  const raw = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+  return SORT_KEYS.includes(raw.key as SortKey) && (raw.dir === 'asc' || raw.dir === 'desc') ? { key: raw.key as SortKey, dir: raw.dir } : DEFAULT_SORT
+}
+const byName = (a: PolyboxFile, b: PolyboxFile) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+const time = (iso: string | undefined) => { const value = iso ? Date.parse(iso) : NaN; return Number.isFinite(value) ? value : null }
+/**
+ * Folders first, then files, each by the chosen column (28 Nov, on request: "add desc asc sort"); names sort as people
+ * sort (Serie 2 before Serie 10), a missing date or size always goes last, and equal values fall back to the name.
+ */
+export function sortFiles(files: PolyboxFile[], sort: FileSort = DEFAULT_SORT): PolyboxFile[] {
+  const sign = sort.dir === 'desc' ? -1 : 1
+  const value = (file: PolyboxFile) => sort.key === 'size' ? (file.isFolder ? null : file.size ?? null) : sort.key === 'created' ? time(file.created) : sort.key === 'modified' ? time(file.modified) : null
+  return [...files].sort((a, b) => {
+    if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1
+    if (sort.key === 'name') return sign * byName(a, b)
+    const x = value(a), y = value(b)
+    if (x === null || y === null) return x === y ? byName(a, b) : x === null ? 1 : -1
+    return sign * (x - y) || byName(a, b)
+  })
 }
 
 /** The share's own title from its public page (`og:title`), entities decoded; '' when it has none. */

@@ -9,8 +9,8 @@
  */
 import type { MainWorkspaceNavigation, ValleyPluginApi } from '@valley/plugin-sdk'
 import {
-  MAX_LINKS, POLYBOX_INSTANCE, linksOf, parsePasted, shareToken, sharePageUrl, sortFiles, subjectInstance, subjectOf,
-  type PolyboxFile, type PolyboxLink
+  MAX_LINKS, POLYBOX_INSTANCE, linksOf, parsePasted, shareToken, sharePageUrl, sortFiles, sortOf, subjectInstance, subjectOf,
+  type PolyboxFile, type PolyboxLink, type SortKey
 } from './model'
 
 type Shapes = string[]
@@ -23,10 +23,25 @@ const LINK: Shapes = ['M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1', 'M14 
 const CLOSE: Shapes = ['M6 6l12 12', 'M18 6L6 18']
 const PEN: Shapes = ['M4 20h4L19 9a2.1 2.1 0 0 0-4-4L4 16z', 'M13.5 6.5l4 4']
 const TRASH: Shapes = ['M4 7h16', 'M10 11v6', 'M14 11v6', 'M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-12', 'M9 7V4h6v3']
-const CHEVRON: Shapes = ['M9 6l6 6-6 6']
+const COPY: Shapes = ['M9 9a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z', 'M15 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h4']
+const CHECK: Shapes = ['M5 12.5l4.5 4.5L19 7.5']
+/** The path separator and the share's root (28 Nov, on request: "make the slash breadcrumb icon centered"): a drawn slash, centred in its box like the other glyphs, never a text "/" that sits on the baseline. */
+const SLASH: Shapes = ['M14.5 5l-5 14']
+const ARROW_UP: Shapes = ['M12 19V5', 'M6 11l6-6 6 6']
+const ARROW_DOWN: Shapes = ['M12 5v14', 'M6 13l6 6 6-6']
 const FOLDER: Shapes = ['M3.5 7a1.5 1.5 0 0 1 1.5-1.5h4l2 2h8a1.5 1.5 0 0 1 1.5 1.5v8.5A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5z']
 const FILE: Shapes = ['M14 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z', 'M14 3.5V8h4.5']
 const PDF: Shapes = [...FILE, 'M8.5 13h7', 'M8.5 16.5h5']
+const GRID: Shapes = ['M4 5a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z', 'M13 5a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1z', 'M4 14a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z', 'M13 14a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1z']
+const LIST: Shapes = ['M9 6h11', 'M9 12h11', 'M9 18h11', 'M4.5 6h.01', 'M4.5 12h.01', 'M4.5 18h.01']
+const LOCK: Shapes = ['M6 11a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1z', 'M8.5 10V7.5a3.5 3.5 0 0 1 7 0V10']
+/** Grid tiles use Font Awesome's folder and file glyphs (react-icons `FaFolder`, `FaRegFile`, `FaRegFilePdf`, `FaRegFileImage`; 28 Nov, on request), inlined so the bundle carries no icon library. */
+type Glyph = { viewBox: string; d: string }
+const FA_FILE_D = 'M369.9 97.9L286 14C277 5 264.8-.1 252.1-.1H48C21.5 0 0 21.5 0 48v416c0 26.5 21.5 48 48 48h288c26.5 0 48-21.5 48-48V131.9c0-12.7-5.1-25-14.1-34zM332.1 128H256V51.9l76.1 76.1zM48 464V48h160v104c0 13.3 10.7 24 24 24h104v288H48z'
+const FA_FOLDER: Glyph = { viewBox: '0 0 512 512', d: 'M464 128H272l-64-64H48C21.49 64 0 85.49 0 112v288c0 26.51 21.49 48 48 48h416c26.51 0 48-21.49 48-48V176c0-26.51-21.49-48-48-48z' }
+const FA_FILE: Glyph = { viewBox: '0 0 384 512', d: FA_FILE_D }
+const FA_FILE_PDF: Glyph = { viewBox: '0 0 384 512', d: `${FA_FILE_D}m250.2-143.7c-12.2-12-47-8.7-64.4-6.5-17.2-10.5-28.7-25-36.8-46.3 3.9-16.1 10.1-40.6 5.4-56-4.2-26.2-37.8-23.6-42.6-5.9-4.4 16.1-.4 38.5 7 67.1-10 23.9-24.9 56-35.4 74.4-20 10.3-47 26.2-51 46.2-3.3 15.8 26 55.2 76.1-31.2 22.4-7.4 46.8-16.5 68.4-20.1 18.9 10.2 41 17 55.8 17 25.5 0 28-28.2 17.5-38.7zm-198.1 77.8c5.1-13.7 24.5-29.5 30.4-35-19 30.3-30.4 35.7-30.4 35zm81.6-190.6c7.4 0 6.7 32.1 1.8 40.8-4.4-13.9-4.3-40.8-1.8-40.8zm-24.4 136.6c9.7-16.9 18-37 24.7-54.7 8.3 15.1 18.9 27.2 30.1 35.5-20.8 4.3-38.9 13.1-54.8 19.2zm131.6-5s-5 6-37.3-7.8c35.1-2.6 40.9 5.4 37.3 7.8z` }
+const FA_FILE_IMAGE: Glyph = { viewBox: '0 0 384 512', d: `${FA_FILE_D}m32-48h224V288l-23.5-23.5c-4.7-4.7-12.3-4.7-17 0L176 352l-39.5-39.5c-4.7-4.7-12.3-4.7-17 0L80 352v64zm48-240c-26.5 0-48 21.5-48 48s21.5 48 48 48 48-21.5 48-48-21.5-48-48-48z` }
 const IMAGE: Shapes = ['M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z', 'M8.5 10a1.5 1.5 0 1 0 0-.01', 'M20 15l-4.5-4.5L6 20']
 
 export const POLYBOX_CSS = `
@@ -49,16 +64,25 @@ export const POLYBOX_CSS = `
 .pbx-rename { width: 100%; min-width: 0; box-sizing: border-box; height: 22px; margin: -2px 0; padding: 0 4px; border: 1px solid var(--accent-color); border-radius: 3px; outline: 0; background: var(--background-color, transparent); color: var(--title-color); font: inherit; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { .pbx-row, .pbx-file { transition: none; } }
 .pbx-empty { padding: 14px 12px; color: var(--text-secondary); font-size: var(--small-font-size); line-height: 1.45; }
-/* A subject's page: the folder path as a fixed second bar, then the folder's entries as Email-like rows. */
-.poly-page .poly-bar.pbx-path { justify-content: center; padding: 0 24px; overflow: hidden; }
+/*
+ * A subject's page (28 Nov, on request): the title bar names the share's Polybox link, the second bar is the folder path as
+ * left-aligned breadcrumbs, then the entries edge to edge as list rows of exactly one header height or as a grid.
+ */
+.poly-page-head .poly-bar-balance.triple { width: calc(var(--shell-control-toolbar, 24px) * 3 + 16px); }
+.poly-icon-btn.pbx-copy.done { color: var(--tint-green-text, var(--accent-color)); }
+.poly-page .poly-bar.pbx-path { justify-content: flex-start; padding: 0 6px; overflow: hidden; }
 .pbx-crumbs { display: flex; align-items: center; gap: 2px; min-width: 0; overflow: hidden; white-space: nowrap; }
-.pbx-crumb { flex-shrink: 1; min-width: 0; max-width: 260px; padding: 2px 6px; border: 0; border-radius: var(--radius-sm, 4px); background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--small-font-size); overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
+.pbx-crumb { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 1; min-width: 0; max-width: 320px; height: var(--search-field-height, 26px); padding: 0 6px; border: 0; border-radius: var(--radius-sm, 4px); background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--small-font-size); cursor: pointer; }
+.pbx-crumb-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pbx-crumb.root { justify-content: center; width: var(--search-field-height, 26px); padding: 0; color: var(--text-secondary); }
+.pbx-crumb.root svg, .pbx-crumb-sep svg { display: block; width: 14px; height: 14px; }
+.pbx-crumb.root[aria-current="page"] { color: var(--title-color); }
 .pbx-crumb:hover { background: var(--hover-bg); color: var(--text-color); }
 .pbx-crumb[aria-current="page"] { color: var(--title-color); font-weight: 600; cursor: default; background: transparent; }
-.pbx-crumb-sep { display: grid; place-items: center; flex-shrink: 0; color: var(--text-tertiary, var(--text-secondary)); }
-.pbx-crumb-sep svg { width: 12px; height: 12px; }
-.pbx-files { max-width: 980px; margin: 0 auto; padding: 8px 24px 32px; }
-.pbx-file { display: grid; grid-template-columns: 18px minmax(0, 1fr) max-content max-content; align-items: center; gap: 12px; width: 100%; box-sizing: border-box; height: var(--app-bar-height); padding: 0 8px; border: 0; border-bottom: 1px solid var(--border-light); border-radius: 0; background: transparent; color: var(--text-color); font: inherit; text-align: left; cursor: pointer; transition: background-color 120ms ease-out; }
+.pbx-crumb-sep { display: grid; place-items: center; flex-shrink: 0; width: 14px; height: var(--search-field-height, 26px); color: var(--text-tertiary, var(--text-secondary)); }
+.pbx-files { padding: 0 0 32px; }
+.pbx-files > .poly-note { padding: 8px 12px; }
+.pbx-file, .pbx-columns { display: grid; grid-template-columns: 18px minmax(0, 1fr) var(--pbx-date-col, 128px) var(--pbx-date-col, 128px) 84px; align-items: center; gap: 12px; width: 100%; box-sizing: border-box; height: var(--app-bar-height); padding: 0 12px; border: 0; border-bottom: 1px solid var(--border-light); border-radius: 0; background: transparent; color: var(--text-color); font: inherit; text-align: left; cursor: pointer; transition: background-color 120ms ease-out; }
 .pbx-file:hover { background: color-mix(in srgb, var(--title-color) 5%, transparent); }
 .pbx-file[aria-busy="true"] { cursor: progress; opacity: 0.6; }
 .pbx-file-icon { display: grid; place-items: center; color: var(--text-tertiary, var(--text-secondary)); }
@@ -66,12 +90,52 @@ export const POLYBOX_CSS = `
 .pbx-file-icon svg { width: 16px; height: 16px; }
 .pbx-file-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pbx-file.folder .pbx-file-name { color: var(--title-color); font-weight: 600; }
-.pbx-file-date, .pbx-file-size { color: var(--text-tertiary, var(--text-secondary)); font-size: var(--small-font-size); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.pbx-file-size { min-width: 64px; text-align: right; }
-@container (max-width: 560px) { .pbx-files { padding: 4px 8px 24px; } .pbx-file { grid-template-columns: 18px minmax(0, 1fr) max-content; } .pbx-file-date { display: none; } }
+.pbx-file-date, .pbx-file-size { color: var(--text-tertiary, var(--text-secondary)); font-size: var(--small-font-size); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: center; overflow: hidden; text-overflow: ellipsis; }
+/* The column titles (28 Nov, on request: "filename | date created | date last modified | file size"), on the rows' grid. */
+.poly-page .poly-bar.pbx-columns { display: grid; padding: 0 12px; gap: 12px; }
+.pbx-col { display: flex; align-items: center; justify-content: center; gap: 4px; min-width: 0; height: 26px; margin: 0; padding: 0 8px; border: 0; border-radius: var(--radius-m, 6px); transition: background-color 120ms ease-out, color 120ms ease-out; background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--smaller-font-size); font-weight: 600; white-space: nowrap; cursor: pointer; }
+.pbx-col:hover { color: var(--text-color); background: var(--hover-bg); }
+.pbx-col.active { color: var(--title-color); }
+.pbx-col:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -2px; }
+.pbx-col-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pbx-col-arrow { display: grid; place-items: center; flex-shrink: 0; }
+.pbx-col-arrow svg { width: 12px; height: 12px; }
+.pbx-col.name { grid-column: 1 / 3; justify-self: start; justify-content: flex-start; margin-left: -8px; }
+@media (prefers-reduced-motion: reduce) { .pbx-col { transition: none; } }
+.pbx-col + .pbx-col { position: relative; overflow: visible; }
+.pbx-col + .pbx-col::before { content: ''; position: absolute; left: -6px; top: 4px; bottom: 4px; border-left: 1px solid var(--border-light); }
+@container (max-width: 720px) { .pbx-file, .pbx-columns { grid-template-columns: 18px minmax(0, 1fr) var(--pbx-date-col, 128px) 84px; } .pbx-file-date.created, .pbx-col.created { display: none; } }
+@container (max-width: 520px) { .pbx-file, .pbx-columns { grid-template-columns: 18px minmax(0, 1fr) 72px; } .pbx-file-date, .pbx-col.created, .pbx-col.modified { display: none; } }
+.pbx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 6px; padding: 12px 12px 32px; }
+.pbx-grid > .poly-note { grid-column: 1 / -1; padding: 0; }
+.pbx-tile { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; box-sizing: border-box; padding: 16px 8px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--text-color); font: inherit; text-align: center; cursor: pointer; transition: background-color 120ms ease-out; }
+.pbx-tile:hover { background: color-mix(in srgb, var(--title-color) 5%, transparent); }
+.pbx-tile:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -2px; }
+.pbx-tile[aria-busy="true"] { cursor: progress; opacity: 0.6; }
+.pbx-tile-icon { display: grid; place-items: center; height: 52px; margin-bottom: 4px; color: var(--text-tertiary, var(--text-secondary)); }
+.pbx-tile-icon svg { width: 44px; height: 44px; }
+.pbx-tile.folder .pbx-tile-icon { color: var(--accent-color); }
+.pbx-tile.folder .pbx-tile-icon svg { width: 52px; height: 52px; }
+.pbx-tile-name { display: -webkit-box; max-width: 100%; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: var(--small-font-size); line-height: 1.3; overflow-wrap: anywhere; }
+.pbx-tile.folder .pbx-tile-name { color: var(--title-color); font-weight: 600; }
+.pbx-tile-meta { color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .pbx-tile { transition: none; } }
+.pbx-lock { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 360px; margin: 48px auto 0; padding: 0 16px; text-align: center; }
+.pbx-lock-icon { display: grid; place-items: center; color: var(--text-tertiary, var(--text-secondary)); }
+.pbx-lock-icon svg { width: 28px; height: 28px; }
+.pbx-lock-text { margin: 0; color: var(--text-secondary); font-size: var(--small-font-size); line-height: 1.45; }
+.pbx-lock-row { display: flex; gap: 6px; width: 100%; }
+.pbx-lock-input { flex: 1; min-width: 0; box-sizing: border-box; height: var(--search-field-height, 26px); padding: 0 8px; border: 1px solid var(--border-color, var(--border-light)); border-radius: var(--radius-sm, 4px); outline: 0; background: var(--background-color, transparent); color: var(--text-color); font: inherit; font-size: var(--small-font-size); }
+.pbx-lock-input:focus { border-color: var(--accent-color); }
+.pbx-lock-btn { flex-shrink: 0; height: var(--search-field-height, 26px); padding: 0 12px; border: 0; border-radius: var(--radius-sm, 4px); background: var(--accent-color); color: #fff; font: inherit; font-size: var(--small-font-size); font-weight: 600; cursor: pointer; }
+.pbx-lock-btn:disabled { opacity: 0.5; cursor: default; }
+.pbx-lock-btn:focus-visible { outline: 2px solid var(--accent-color); outline-offset: 2px; }
+.pbx-lock-note { color: var(--tint-red-text, var(--text-secondary)); font-size: var(--small-font-size); }
 `
 
-type Listing = { files: PolyboxFile[] | null; error: string; loading: boolean }
+type Listing = { files: PolyboxFile[] | null; error: string; code: string; loading: boolean }
+type View = 'list' | 'grid'
+const viewOf = (value: unknown): View => value === 'grid' ? 'grid' : 'list'
 
 export function createPolyboxViews(api: ValleyPluginApi, t: (key: string) => string) {
   const React = api.React
@@ -79,6 +143,7 @@ export function createPolyboxViews(api: ValleyPluginApi, t: (key: string) => str
   type Node = ReturnType<typeof h>
   const Icon = ({ shapes }: { shapes: Shapes }): Node => h('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true },
     ...shapes.map(d => h('path', { key: d, d })))
+  const FaIcon = ({ glyph }: { glyph: Glyph }): Node => h('svg', { viewBox: glyph.viewBox, fill: 'currentColor', 'aria-hidden': true }, h('path', { d: glyph.d }))
   const fill = (template: string, values: Record<string, string | number>) => Object.entries(values).reduce((text, [name, value]) => text.replace(`{${name}}`, String(value)), template)
   const problem = (error: unknown) => { const key = `polybox.error.${error instanceof Error ? error.message : ''}`; return t(key) === key ? t('polybox.error.serviceError') : t(key) }
 
@@ -239,14 +304,14 @@ export function createPolyboxViews(api: ValleyPluginApi, t: (key: string) => str
 
   function useListing(token: string, path: string, revision: number): Listing {
     const key = `${token}:${path}`
-    const [state, setState] = React.useState<Listing>(() => ({ files: listings.get(key) ?? null, error: '', loading: !listings.has(key) }))
+    const [state, setState] = React.useState<Listing>(() => ({ files: listings.get(key) ?? null, error: '', code: '', loading: !listings.has(key) }))
     React.useEffect(() => {
       let live = true
       const cached = listings.get(key)
-      setState({ files: cached ?? null, error: '', loading: !cached || revision > 0 })
+      setState({ files: cached ?? null, error: '', code: '', loading: !cached || revision > 0 })
       api.backend.call<PolyboxFile[]>('polybox.list', { token, path, fresh: revision > 0 }).then(
-        files => { listings.set(key, files); if (live) setState({ files, error: '', loading: false }) },
-        error => { if (live) setState({ files: cached ?? null, error: problem(error), loading: false }) })
+        files => { listings.set(key, files); if (live) setState({ files, error: '', code: '', loading: false }) },
+        error => { if (live) setState({ files: cached ?? null, error: problem(error), code: error instanceof Error ? error.message : '', loading: false }) })
       return () => { live = false }
     }, [key, revision])
     return state
@@ -260,7 +325,40 @@ export function createPolyboxViews(api: ValleyPluginApi, t: (key: string) => str
     return `${new Intl.NumberFormat(locale, { maximumFractionDigits: unit && value < 10 ? 1 : 0 }).format(value)} ${units[unit]}`
   }
   const formatDate = (iso: string | undefined, locale: string) => iso ? new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso)) : ''
-  const fileIcon = (file: PolyboxFile) => file.isFolder ? FOLDER : file.type === 'application/pdf' || /\.pdf$/i.test(file.name) ? PDF : file.type?.startsWith('image/') ? IMAGE : FILE
+  const isPdf = (file: PolyboxFile) => file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
+  const isImage = (file: PolyboxFile) => Boolean(file.type?.startsWith('image/'))
+  const fileIcon = (file: PolyboxFile) => file.isFolder ? FOLDER : isPdf(file) ? PDF : isImage(file) ? IMAGE : FILE
+  const fileGlyph = (file: PolyboxFile) => file.isFolder ? FA_FOLDER : isPdf(file) ? FA_FILE_PDF : isImage(file) ? FA_FILE_IMAGE : FA_FILE
+
+  /**
+   * A password share's lock (28 Nov, on request): the password is checked against Polybox and, when it fits, stored
+   * encrypted by the backend for this share; the listing then loads with it. A stored password that stopped fitting asks again.
+   */
+  function PasswordForm({ token, stale, onUnlocked }: { token: string; stale: boolean; onUnlocked: () => void }): Node {
+    const [value, setValue] = React.useState('')
+    const [busy, setBusy] = React.useState(false)
+    const [note, setNote] = React.useState('')
+    const submit = async (event: Event) => {
+      event.preventDefault()
+      if (!value || busy) return
+      setBusy(true); setNote('')
+      try {
+        const result = await api.backend.call<{ ok: true } | { ok: false; reason: 'rejected' | 'network' }>('polybox.unlock', { token, password: value })
+        if (result.ok) { setValue(''); onUnlocked(); return }
+        setNote(t(result.reason === 'rejected' ? 'polybox.password.rejected' : 'polybox.error.networkError'))
+      } catch (error) { setNote(problem(error)) }
+      finally { setBusy(false) }
+    }
+    const label = t('polybox.password.placeholder')
+    return h('form', { className: 'pbx-lock', onSubmit: (event: Event) => void submit(event) },
+      h('span', { className: 'pbx-lock-icon' }, h(Icon, { shapes: LOCK })),
+      h('p', { className: 'pbx-lock-text' }, t(stale ? 'polybox.password.stale' : 'polybox.password.needed')),
+      h('div', { className: 'pbx-lock-row' },
+        h('input', { className: 'pbx-lock-input', type: 'password', value, placeholder: label, 'aria-label': label, autoFocus: true, autoComplete: 'off', spellCheck: false, disabled: busy,
+          onChange: (event: { target: HTMLInputElement }) => { setValue(event.target.value); setNote('') } }),
+        h('button', { type: 'submit', className: 'pbx-lock-btn', disabled: busy || !value }, t('polybox.password.unlock'))),
+      note ? h('div', { className: 'pbx-lock-note', role: 'alert' }, note) : null)
+  }
 
   function SubjectPage({ token, instanceId, navigation }: { token: string; instanceId?: string; navigation?: MainWorkspaceNavigation }): Node {
     const links = useLinks()
@@ -293,8 +391,11 @@ export function createPolyboxViews(api: ValleyPluginApi, t: (key: string) => str
     const locale = api.ui.language() || 'en'
     React.useEffect(() => { api.workspace.setMainTabTitle(title, instanceId) }, [instanceId, title])
     const parts = path ? path.split('/') : []
-    const crumbs = [{ label: title, path: '' }, ...parts.map((part, index) => ({ label: part, path: parts.slice(0, index + 1).join('/') }))]
-    const files = listing.files ? sortFiles(listing.files) : null
+    const crumbs = [{ label: '/', path: '' }, ...parts.map((part, index) => ({ label: part, path: parts.slice(0, index + 1).join('/') }))]
+    const sort = sortOf(api.settings.get().polyboxSort)
+    const files = listing.files ? sortFiles(listing.files, sort) : null
+    /** A click on a column title sorts by it; a second click on the same title reverses the order. */
+    const sortBy = (key: SortKey) => void api.settings.set('polyboxSort', { key, dir: sort.key === key && sort.dir === 'asc' ? 'desc' : 'asc' })
     const [opening, setOpening] = React.useState('')
     const [openError, setOpenError] = React.useState('')
     /**
@@ -337,33 +438,65 @@ export function createPolyboxViews(api: ValleyPluginApi, t: (key: string) => str
       else if (choice === 'website') void api.links.open(sharePageUrl(token, file.isFolder ? file.path : file.path.split('/').slice(0, -1).join('/')))
       else if (choice === 'valley' || choice === 'tab' || choice === 'system' || choice === 'finder') void act(file, choice)
     }
-    const body = listing.error && !files ? h('div', { className: 'poly-note error', role: 'alert' }, listing.error)
+    const view = viewOf(api.settings.get().polyboxView)
+    const locked = listing.code === 'polyboxPassword' || listing.code === 'polyboxWrongPassword'
+    const unlocked = () => {
+      for (const key of [...listings.keys()]) if (key.startsWith(`${token}:`)) listings.delete(key)
+      named.delete(token)
+      nameMissing()
+      setRevision(value => value + 1)
+    }
+    const fileProps = (file: PolyboxFile, className: string) => ({
+      key: file.path, type: 'button', className: `${className}${file.isFolder ? ' folder' : ''}`, 'data-path': file.path,
+      title: file.isFolder ? fill(t('polybox.openFolder'), { name: file.name }) : fill(t('polybox.openFile'), { name: file.name }),
+      'aria-busy': opening === file.path || undefined, disabled: opening === file.path,
+      onClick: (event: MouseEvent) => open(file, event),
+      onAuxClick: (event: MouseEvent) => { if (event.button === 1 && !file.isFolder) { event.preventDefault(); void act(file, 'tab') } },
+      onContextMenu: (event: MouseEvent) => void menu(event, file)
+    })
+    const body = locked && !files ? h(PasswordForm, { token, stale: listing.code === 'polyboxWrongPassword', onUnlocked: unlocked })
+      : listing.error && !files ? h('div', { className: 'poly-note error', role: 'alert' }, listing.error)
       : !files ? (listing.loading ? null : h('div', { className: 'poly-note' }, t('polybox.folderEmpty')))
       : !files.length ? h('div', { className: 'poly-note' }, t('polybox.folderEmpty'))
-      : h(React.Fragment, null, files.map(file => h('button', {
-        key: file.path, type: 'button', className: `pbx-file${file.isFolder ? ' folder' : ''}`, 'data-path': file.path,
-        title: file.isFolder ? fill(t('polybox.openFolder'), { name: file.name }) : fill(t('polybox.openFile'), { name: file.name }),
-        'aria-busy': opening === file.path || undefined, disabled: opening === file.path,
-        onClick: (event: MouseEvent) => open(file, event),
-        onAuxClick: (event: MouseEvent) => { if (event.button === 1 && !file.isFolder) { event.preventDefault(); void act(file, 'tab') } },
-        onContextMenu: (event: MouseEvent) => void menu(event, file)
-      },
+      : view === 'grid' ? h(React.Fragment, null, files.map(file => h('button', fileProps(file, 'pbx-tile'),
+        h('span', { className: 'pbx-tile-icon' }, h(FaIcon, { glyph: fileGlyph(file) })),
+        h('span', { className: 'pbx-tile-name' }, file.name),
+        h('span', { className: 'pbx-tile-meta' }, file.isFolder ? formatDate(file.modified, locale) : formatSize(file.size, locale)))))
+      : h(React.Fragment, null, files.map(file => h('button', fileProps(file, 'pbx-file'),
       h('span', { className: 'pbx-file-icon' }, h(Icon, { shapes: fileIcon(file) })),
       h('span', { className: 'pbx-file-name' }, file.name),
-      h('span', { className: 'pbx-file-date' }, formatDate(file.modified, locale)),
+      h('span', { className: 'pbx-file-date created' }, formatDate(file.created, locale)),
+      h('span', { className: 'pbx-file-date modified' }, formatDate(file.modified, locale)),
       h('span', { className: 'pbx-file-size' }, file.isFolder ? '' : formatSize(file.size, locale)))))
+    const shareLink = sharePageUrl(token)
+    const [copied, setCopied] = React.useState(false)
+    React.useEffect(() => { if (!copied) return; const timer = setTimeout(() => setCopied(false), 1500); return () => clearTimeout(timer) }, [copied])
+    const copyLink = () => { api.ui.writeClipboardText(shareLink).then(() => setCopied(true), () => setOpenError(t('polybox.copyFailed'))) }
+    const copyLabel = copied ? t('polybox.copied') : t('polybox.copyLink')
+    const viewLabel = t(view === 'grid' ? 'polybox.view.list' : 'polybox.view.grid')
     return h('div', { className: 'poly-page' },
       h('div', { className: 'poly-bar poly-page-head' },
-        h('span', { className: 'poly-bar-balance double', 'aria-hidden': true }),
-        h('h1', { className: 'poly-page-title' }, title),
-        h('button', { type: 'button', className: 'poly-icon-btn', title: t('polybox.openWebsite'), 'aria-label': t('polybox.openWebsite'), onClick: () => void api.links.open(sharePageUrl(token, path)) }, h(Icon, { shapes: OPEN })),
+        h('span', { className: 'poly-bar-balance triple', 'aria-hidden': true }),
+        h('h1', { className: 'poly-page-title', title }, title),
+        h('button', { type: 'button', className: 'poly-icon-btn', title: viewLabel, 'aria-label': viewLabel, 'aria-pressed': view === 'grid', onClick: () => void api.settings.set('polyboxView', view === 'grid' ? 'list' : 'grid') }, h(Icon, { shapes: view === 'grid' ? LIST : GRID })),
+        h('button', { type: 'button', className: `poly-icon-btn pbx-copy${copied ? ' done' : ''}`, title: `${copyLabel} (${shareLink})`, 'aria-label': copyLabel, onClick: copyLink }, h(Icon, { shapes: copied ? CHECK : COPY })),
         h('button', { type: 'button', className: `poly-icon-btn${listing.loading && revision > 0 ? ' spinning' : ''}`, title: t('refresh'), 'aria-label': t('refresh'), onClick: () => setRevision(value => value + 1) }, h(Icon, { shapes: REFRESH }))),
       h('div', { className: 'poly-bar pbx-path' }, h('nav', { className: 'pbx-crumbs', 'aria-label': t('polybox.path') },
         ...crumbs.flatMap((crumb, index) => [
-          index ? h('span', { key: `sep${index}`, className: 'pbx-crumb-sep', 'aria-hidden': true }, h(Icon, { shapes: CHEVRON })) : null,
-          h('button', { key: crumb.path || '/', type: 'button', className: 'pbx-crumb', 'aria-current': index === crumbs.length - 1 ? 'page' : undefined, title: crumb.label, onClick: () => { if (index < crumbs.length - 1) setPath(crumb.path) } }, crumb.label)
+          index > 1 ? h('span', { key: `sep${index}`, className: 'pbx-crumb-sep', 'aria-hidden': true }, h(Icon, { shapes: SLASH })) : null,
+          h('button', { key: crumb.path || '/', type: 'button', className: `pbx-crumb${index ? '' : ' root'}`, 'aria-current': index === crumbs.length - 1 ? 'page' : undefined, title: index ? crumb.label : title, 'aria-label': index ? undefined : title, onClick: () => { if (index < crumbs.length - 1) setPath(crumb.path) } },
+            index ? h('span', { className: 'pbx-crumb-label' }, crumb.label) : h(Icon, { shapes: SLASH }))
         ]))),
-      h('div', { className: 'poly-list' }, h('div', { className: 'pbx-files' }, body,
+      view === 'list' && files?.length ? h('div', { className: 'poly-bar pbx-columns', role: 'toolbar', 'aria-label': t('polybox.sort.label') },
+        ...(['name', 'created', 'modified', 'size'] as SortKey[]).map(key => {
+          const active = sort.key === key
+          const label = t(`polybox.column.${key}`)
+          return h('button', {
+            key, type: 'button', className: `pbx-col ${key}${active ? ' active' : ''}`, 'aria-sort': active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : undefined,
+            title: fill(t(active && sort.dir === 'asc' ? 'polybox.sort.desc' : 'polybox.sort.asc'), { column: label }), onClick: () => sortBy(key)
+          }, h('span', { className: 'pbx-col-label' }, label), active ? h('span', { className: 'pbx-col-arrow', 'aria-hidden': true }, h(Icon, { shapes: sort.dir === 'asc' ? ARROW_UP : ARROW_DOWN })) : null)
+        })) : null,
+      h('div', { className: 'poly-list' }, h('div', { className: view === 'grid' && files?.length ? 'pbx-grid' : 'pbx-files' }, body,
         listing.error && files ? h('div', { className: 'poly-note error', role: 'alert' }, listing.error) : null,
         openError ? h('div', { className: 'poly-note error', role: 'alert' }, openError) : null)))
   }

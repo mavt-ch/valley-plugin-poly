@@ -354,6 +354,62 @@
         }
       },
       {
+        "key": "polyboxView",
+        "label": "Polybox view",
+        "labelKey": "polybox.settings.view.title",
+        "type": "custom",
+        "settingsVisible": false,
+        "default": "list",
+        "description": "How a Polybox folder shows its entries: as a list or as a grid.",
+        "descriptionKey": "polybox.settings.view.description",
+        "schema": {
+          "type": "string",
+          "enum": [
+            "list",
+            "grid"
+          ]
+        }
+      },
+      {
+        "key": "polyboxSort",
+        "label": "Polybox sort",
+        "labelKey": "polybox.settings.sort.title",
+        "type": "custom",
+        "settingsVisible": false,
+        "default": {
+          "key": "name",
+          "dir": "asc"
+        },
+        "description": "Which column a Polybox folder is sorted by, ascending or descending; folders stay first.",
+        "descriptionKey": "polybox.settings.sort.description",
+        "schema": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "dir"
+          ],
+          "properties": {
+            "key": {
+              "type": "string",
+              "enum": [
+                "name",
+                "created",
+                "modified",
+                "size"
+              ]
+            },
+            "dir": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          }
+        }
+      },
+      {
         "key": "building",
         "label": "Building",
         "labelKey": "settings.building.title",
@@ -478,6 +534,7 @@
         "polybox.ethz.ch"
       ]
     },
+    "credentials": true,
     "storage": {
       "metadata": [
         "plugins/data/poly/model",

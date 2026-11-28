@@ -11,19 +11,22 @@ const SHARE = 'https://polybox.ethz.ch/index.php/s/AbCdEf1234567'
 const OTHER = 'https://polybox.ethz.ch/index.php/s/ZyXwVu9876543'
 const dav = (path: string) => `${shareDavUrl('AbCdEf1234567')}${path}`
 const ROOT: PolyboxFile[] = [
-  { name: 'Serie 10.pdf', path: 'Serie 10.pdf', isFolder: false, size: 362419, modified: '2026-11-26T14:55:14.000Z', type: 'application/pdf', url: dav('Serie%2010.pdf') },
+  { name: 'Serie 10.pdf', path: 'Serie 10.pdf', isFolder: false, size: 362419, created: '2026-11-20T09:00:00.000Z', modified: '2026-11-26T14:55:14.000Z', type: 'application/pdf', url: dav('Serie%2010.pdf') },
   { name: 'Übungsstunden', path: 'Übungsstunden', isFolder: true, modified: '2026-11-27T13:02:21.000Z', url: dav('%C3%9Cbungsstunden/') },
   { name: 'Serie 2.pdf', path: 'Serie 2.pdf', isFolder: false, size: 104601, modified: '2026-09-23T16:18:49.000Z', type: 'application/pdf', url: dav('Serie%202.pdf') }
 ]
 const LESSONS: PolyboxFile[] = [{ name: 'Lektion 01.pdf', path: 'Übungsstunden/Lektion 01.pdf', isFolder: false, size: 6870585, type: 'application/pdf', url: dav('%C3%9Cbungsstunden/Lektion%2001.pdf') }]
 
-function harness(view: 'panel' | 'page', settings: Record<string, unknown> = {}, instanceId?: string) {
+function harness(view: 'panel' | 'page', settings: Record<string, unknown> = {}, instanceId?: string, locked?: { password: string }) {
   const { api } = createMockValleyApi()
   const listeners = new Set<() => void>()
   const calls: [string, Record<string, unknown>][] = []
   api.backend.call = vi.fn(async (name: string, input: Record<string, unknown>) => {
     calls.push([name, input])
+    if (name === 'polybox.title' && locked) return ''
     if (name === 'polybox.title') return input.token === 'AbCdEf1234567' ? 'Analysis I - HS26' : 'Physik I'
+    if (name === 'polybox.unlock') { if (input.password !== locked?.password) return { ok: false, reason: 'rejected' }; locked = undefined; return { ok: true } }
+    if (name === 'polybox.list' && locked) throw new Error('polyboxPassword')
     if (name === 'polybox.list') return input.path === 'Übungsstunden' ? LESSONS : ROOT
     if (name === 'polybox.keep') return `.valley/plugins/data/poly/polybox/${input.token}/${input.path}`
     if (name === 'polybox.forget') return 0
@@ -57,11 +60,13 @@ function harness(view: 'panel' | 'page', settings: Record<string, unknown> = {},
   api.files.revealInFinder = finder as unknown as typeof api.files.revealInFinder
   api.files.revealLabel = (() => 'Show in Finder') as typeof api.files.revealLabel
   api.workspace.revealInFiles = inFiles as unknown as typeof api.workspace.revealInFiles
+  const copy = vi.fn(async () => undefined)
+  api.ui.writeClipboardText = copy as unknown as typeof api.ui.writeClipboardText
   const views = createPolyboxViews(api, t)
   let controller: { canGoBack: boolean; canGoForward: boolean; goBack(): void; goForward(): void } | null = null
   const navigation = { setController: (next: typeof controller) => { controller = next } }
   const { container } = render(api.React.createElement(view === 'panel' ? views.PolyboxPanelBody : views.PolyboxPage, { instanceId, navigation } as never))
-  return { settings, calls, open, openFile, system, finder, inFiles, ownData, goBack, controller: () => controller, openMainTab, setTitle, menus, container, choose: (id: string | null) => { choice = id } }
+  return { copy, settings, calls, open, openFile, system, finder, inFiles, ownData, goBack, controller: () => controller, openMainTab, setTitle, menus, container, choose: (id: string | null) => { choice = id } }
 }
 const paste = (target: Element, text: string) => fireEvent.paste(target, { clipboardData: { getData: (type: string) => type === 'text/plain' ? text : '' } })
 
@@ -84,6 +89,12 @@ describe('Polybox model', () => {
     expect(shareTitle('<meta property="og:title" content="Analysis I - HS26 - MAVT - H&ouml;cker &amp; Co">')).toBe('Analysis I - HS26 - MAVT - Höcker & Co')
     expect(shareTitle('<html></html>')).toBe('')
     expect(sortFiles(ROOT).map(file => file.name)).toEqual(['Übungsstunden', 'Serie 2.pdf', 'Serie 10.pdf'])
+    expect(sortFiles(ROOT, { key: 'name', dir: 'desc' }).map(file => file.name)).toEqual(['Übungsstunden', 'Serie 10.pdf', 'Serie 2.pdf'])
+    expect(sortFiles(ROOT, { key: 'size', dir: 'asc' }).map(file => file.name)).toEqual(['Übungsstunden', 'Serie 2.pdf', 'Serie 10.pdf'])
+    expect(sortFiles(ROOT, { key: 'modified', dir: 'desc' }).map(file => file.name)).toEqual(['Übungsstunden', 'Serie 10.pdf', 'Serie 2.pdf'])
+    // A file without a creation date goes last whichever way the column is sorted.
+    expect(sortFiles(ROOT, { key: 'created', dir: 'asc' }).map(file => file.name)).toEqual(['Übungsstunden', 'Serie 10.pdf', 'Serie 2.pdf'])
+    expect(sortFiles(ROOT, { key: 'created', dir: 'desc' }).map(file => file.name)).toEqual(['Übungsstunden', 'Serie 10.pdf', 'Serie 2.pdf'])
     expect(keptPath('AbCdEf1234567', 'Übungsstunden/Lektion 01.pdf')).toBe('AbCdEf1234567/Übungsstunden/Lektion 01.pdf')
     expect(keptPath('AbCdEf1234567', '.env/a:b')).toBe('AbCdEf1234567/env/a b')
   })
@@ -155,7 +166,7 @@ describe('Polybox page', () => {
     fireEvent.click(container.querySelector('[data-path="Übungsstunden"]')!)
     await settle()
     expect(names()).toEqual(['Lektion 01.pdf'])
-    expect([...container.querySelectorAll('.pbx-crumb')].map(crumb => crumb.textContent)).toEqual(['Analysis I', 'Übungsstunden'])
+    expect([...container.querySelectorAll('.pbx-crumb')].map(crumb => crumb.textContent)).toEqual(['', 'Übungsstunden'])
     fireEvent.click(container.querySelector('.pbx-crumb')!)
     await settle()
     expect(names()).toEqual(['Übungsstunden', 'Serie 2.pdf', 'Serie 10.pdf'])
@@ -208,5 +219,72 @@ describe('Polybox page', () => {
     expect(names()).toEqual(['Übungsstunden', 'Serie 2.pdf', 'Serie 10.pdf'])
     act(() => controller()!.goBack())
     expect(goBack).toHaveBeenCalledOnce()
+  })
+
+  it('names the subject with a copy-link button, shows the path from "/", titles the columns and switches between list and grid', async () => {
+    const { container, settings, copy } = harness('page', { polyboxLinks: [{ name: 'Analysis I', url: SHARE }] }, 'polybox:AbCdEf1234567')
+    await settle()
+    expect(container.querySelector('.poly-page-title')?.textContent).toBe('Analysis I')
+    expect(container.querySelector('.poly-page-head button[aria-label="Open in Polybox"]')).toBeNull()
+    fireEvent.click(container.querySelector('button[aria-label="Copy link"]')!)
+    await settle()
+    expect(copy).toHaveBeenLastCalledWith(SHARE)
+    expect(container.querySelector('button[aria-label="Link copied"]')).not.toBeNull()
+    expect(container.querySelector('.pbx-crumb.root svg')).not.toBeNull()
+    expect(container.querySelector('.pbx-crumb.root')?.getAttribute('aria-label')).toBe('Analysis I')
+    expect([...container.querySelectorAll('.pbx-col')].map(col => col.textContent)).toEqual(['Name', 'Date created', 'Date modified', 'Size'])
+    const names = () => [...container.querySelectorAll('.pbx-file-name')].map(name => name.textContent)
+    expect(container.querySelector('.pbx-col.name')?.getAttribute('aria-sort')).toBe('ascending')
+    fireEvent.click(container.querySelector('.pbx-col.name')!)
+    await settle()
+    expect(settings.polyboxSort).toEqual({ key: 'name', dir: 'desc' })
+    expect(names()).toEqual(['Übungsstunden', 'Serie 10.pdf', 'Serie 2.pdf'])
+    fireEvent.click(container.querySelector('.pbx-col.size')!)
+    await settle()
+    expect(settings.polyboxSort).toEqual({ key: 'size', dir: 'asc' })
+    expect(container.querySelector('.pbx-col.size')?.getAttribute('aria-sort')).toBe('ascending')
+    expect(names()).toEqual(['Übungsstunden', 'Serie 2.pdf', 'Serie 10.pdf'])
+    fireEvent.click(container.querySelector('.pbx-col.size')!)
+    await settle()
+    expect(names()).toEqual(['Übungsstunden', 'Serie 10.pdf', 'Serie 2.pdf'])
+    fireEvent.click(container.querySelector('.pbx-col.name')!)
+    await settle()
+    expect(container.querySelector('[data-path="Serie 10.pdf"] .pbx-file-date.created')?.textContent).toBe('Nov 20, 2026')
+    expect(container.querySelector('[data-path="Serie 10.pdf"] .pbx-file-date.modified')?.textContent).toBe('Nov 26, 2026')
+    expect(container.querySelectorAll('.pbx-file')).toHaveLength(3)
+    fireEvent.click(container.querySelector('button[aria-label="Show as grid"]')!)
+    await settle()
+    expect(settings.polyboxView).toBe('grid')
+    expect(container.querySelector('.pbx-columns')).toBeNull()
+    expect([...container.querySelectorAll('.pbx-grid .pbx-tile-name')].map(name => name.textContent)).toEqual(['Übungsstunden', 'Serie 2.pdf', 'Serie 10.pdf'])
+    expect(container.querySelector('[data-path="Serie 10.pdf"] .pbx-tile-meta')?.textContent).toBe('362 KB')
+    expect(container.querySelector('.pbx-tile.folder svg')?.getAttribute('viewBox')).toBe('0 0 512 512')
+    fireEvent.click(container.querySelector('[data-path="Übungsstunden"]')!)
+    await settle()
+    expect([...container.querySelectorAll('.pbx-crumbs > *')].map(crumb => crumb.textContent)).toEqual(['', 'Übungsstunden'])
+    expect([...container.querySelectorAll('.pbx-tile-name')].map(name => name.textContent)).toEqual(['Lektion 01.pdf'])
+    fireEvent.click(container.querySelector('button[aria-label="Show as list"]')!)
+    await settle()
+    expect(settings.polyboxView).toBe('list')
+    expect(container.querySelectorAll('.pbx-file')).toHaveLength(1)
+  })
+
+  it('asks for a password share\'s password, refuses a wrong one and lists the share once unlocked', async () => {
+    const { container, calls, settings } = harness('page', { polyboxLinks: [{ name: '', url: SHARE }] }, 'polybox:AbCdEf1234567', { password: 'analysis-test' })
+    await settle()
+    const input = container.querySelector<HTMLInputElement>('.pbx-lock-input')!
+    expect(input.type).toBe('password')
+    fireEvent.change(input, { target: { value: 'nope' } })
+    fireEvent.submit(container.querySelector('.pbx-lock')!)
+    await settle()
+    expect(container.querySelector('.pbx-lock-note')?.textContent).toBe('Polybox did not accept this password.')
+    fireEvent.change(container.querySelector('.pbx-lock-input')!, { target: { value: 'analysis-test' } })
+    fireEvent.submit(container.querySelector('.pbx-lock')!)
+    await settle()
+    expect(calls.filter(([name]) => name === 'polybox.unlock').map(([, input]) => input.password)).toEqual(['nope', 'analysis-test'])
+    expect(container.querySelector('.pbx-lock')).toBeNull()
+    expect(container.querySelectorAll('.pbx-file')).toHaveLength(3)
+    expect(calls.filter(([name, input]) => name === 'polybox.title' && input.token === 'AbCdEf1234567').length).toBeGreaterThanOrEqual(2)
+    expect(settings.polyboxLinks).toEqual([{ name: 'Analysis I - HS26', url: SHARE }])
   })
 })
