@@ -70,7 +70,8 @@ export const POLYBOX_CSS = `
  */
 .poly-page-head .poly-bar-balance.triple { width: calc(var(--shell-control-toolbar, 24px) * 3 + 16px); }
 .poly-icon-btn.pbx-copy.done { color: var(--tint-green-text, var(--accent-color)); }
-.poly-page .poly-bar.pbx-path { justify-content: flex-start; padding: 0 6px; overflow: hidden; }
+/* The path is centred in its bar (28 Nov, on request: "still make the breadcrumb centered"). */
+.poly-page .poly-bar.pbx-path { justify-content: center; padding: 0 12px; overflow: hidden; }
 .pbx-crumbs { display: flex; align-items: center; gap: 2px; min-width: 0; overflow: hidden; white-space: nowrap; }
 .pbx-crumb { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 1; min-width: 0; max-width: 320px; height: var(--search-field-height, 26px); padding: 0 6px; border: 0; border-radius: var(--radius-sm, 4px); background: transparent; color: var(--text-secondary); font: inherit; font-size: var(--small-font-size); cursor: pointer; }
 .pbx-crumb-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
