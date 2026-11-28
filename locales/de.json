@@ -324,5 +324,12 @@
   "polybox.sort.asc": "Nach {column} aufsteigend sortieren",
   "polybox.sort.desc": "Nach {column} absteigend sortieren",
   "polybox.settings.sort.title": "Polybox-Sortierung",
-  "polybox.settings.sort.description": "Nach welcher Spalte ein Polybox-Ordner sortiert ist, auf- oder absteigend; Ordner bleiben zuoberst."
+  "polybox.settings.sort.description": "Nach welcher Spalte ein Polybox-Ordner sortiert ist, auf- oder absteigend; Ordner bleiben zuoberst.",
+  "polybox.folder.new": "Neuer Ordner",
+  "polybox.folder.newInside": "Neuer Ordner darin",
+  "polybox.folder.delete": "Ordner löschen",
+  "polybox.settings.folders.title": "Polybox-Ordner",
+  "polybox.settings.folders.description": "Die Ordner der Polybox-Seitenleiste, höchstens drei Ebenen tief.",
+  "polybox.settings.collapsed.title": "Geschlossene Polybox-Ordner",
+  "polybox.settings.collapsed.description": "Die geschlossenen Ordner der Polybox-Seitenleiste."
 }

@@ -117,9 +117,10 @@ describe('Polybox sidebar', () => {
     await settle()
     expect((settings.polyboxLinks as { name: string }[]).map(link => link.name)).toEqual(['Analysis I - HS26', 'Physik I'])
     expect((input as HTMLInputElement).value).toBe('')
+    // Compact rows: the cloud and the name only, the link in the tooltip.
     const rows = [...container.querySelectorAll('.pbx-row')]
-    expect(rows.map(row => [row.querySelector('.pbx-row-name')?.textContent, row.querySelector('.pbx-row-meta')?.textContent])).toEqual([
-      ['Analysis I - HS26', 'polybox.ethz.ch · AbCdEf1234567'], ['Physik I', 'polybox.ethz.ch · ZyXwVu9876543']])
+    expect(rows.map(row => row.textContent)).toEqual(['Analysis I - HS26', 'Physik I'])
+    expect(rows[0].getAttribute('title')).toBe('Analysis I - HS26 · polybox.ethz.ch/s/AbCdEf1234567')
   })
 
   it('opens a subject\'s page, renames it with a double click and removes it from its menu', async () => {
@@ -286,5 +287,74 @@ describe('Polybox page', () => {
     expect(container.querySelectorAll('.pbx-file')).toHaveLength(3)
     expect(calls.filter(([name, input]) => name === 'polybox.title' && input.token === 'AbCdEf1234567').length).toBeGreaterThanOrEqual(2)
     expect(settings.polyboxLinks).toEqual([{ name: 'Analysis I - HS26', url: SHARE }])
+  })
+
+  it('keeps subjects in folders three deep, opens and closes them and reorders by dragging', async () => {
+    const settings: Record<string, unknown> = { polyboxLinks: [{ name: 'Analysis I', url: SHARE }, { name: 'Physik I', url: OTHER }] }
+    const { container } = harness('panel', settings)
+    await settle()
+    // A new folder is named in place.
+    fireEvent.click(container.querySelector('button[aria-label="New folder"]')!)
+    await settle()
+    const field = container.querySelector('.pbx-rename') as HTMLInputElement
+    fireEvent.change(field, { target: { value: 'Semester 2' } })
+    fireEvent.keyDown(field, { key: 'Enter' })
+    await settle()
+    const folders = settings.polyboxFolders as { id: string; name: string }[]
+    expect(folders.map(folder => folder.name)).toEqual(['Semester 2'])
+    const folderRow = () => container.querySelector<HTMLElement>('.pbx-row.folder')!
+    expect(folderRow().getAttribute('aria-expanded')).toBe('true')
+    // Rows 28px apart, top to bottom: the folder, then the two subjects.
+    const place = () => [...container.querySelectorAll<HTMLElement>('[data-row]')].forEach((row, index) => { row.getBoundingClientRect = () => ({ top: index * 28, bottom: index * 28 + 28, height: 28, left: 0, right: 200, width: 200, x: 0, y: index * 28, toJSON: () => ({}) }) })
+    place()
+    const list = container.querySelector<HTMLElement>('.pbx-list')!
+    list.setPointerCapture = () => undefined
+    list.releasePointerCapture = () => undefined
+    const physik = container.querySelector<HTMLElement>(`[data-subject="ZyXwVu9876543"]`)!
+    fireEvent.pointerDown(physik, { button: 0, pointerId: 1, clientX: 20, clientY: 70 })
+    fireEvent.pointerMove(list, { pointerId: 1, clientX: 20, clientY: 40 })
+    fireEvent.pointerMove(list, { pointerId: 1, clientX: 20, clientY: 14 })
+    expect(folderRow().className).toContain('drop-into')
+    fireEvent.pointerUp(list, { pointerId: 1, clientX: 20, clientY: 14 })
+    await settle()
+    expect(settings.polyboxLinks).toEqual([{ name: 'Analysis I', url: SHARE }, { name: 'Physik I', url: OTHER, folder: folders[0].id }])
+    expect([...container.querySelectorAll('[data-row]')].map(row => row.textContent)).toEqual(['Semester 21', 'Physik I', 'Analysis I'])
+    // The folder icon shows it open; a click closes it and hides its subject.
+    fireEvent.click(folderRow())
+    await settle()
+    expect(settings.polyboxCollapsed).toEqual([folders[0].id])
+    expect(folderRow().getAttribute('aria-expanded')).toBe('false')
+    expect([...container.querySelectorAll('[data-row]')].map(row => row.textContent)).toEqual(['Semester 21', 'Analysis I'])
+    fireEvent.click(folderRow())
+    await settle()
+    // Dropped below the last row, a subject lands at the top level.
+    place()
+    const analysis = container.querySelector<HTMLElement>(`[data-subject="AbCdEf1234567"]`)!
+    fireEvent.pointerDown(analysis, { button: 0, pointerId: 2, clientX: 20, clientY: 70 })
+    fireEvent.pointerMove(list, { pointerId: 2, clientX: 20, clientY: 80 })
+    fireEvent.pointerMove(list, { pointerId: 2, clientX: 20, clientY: 120 })
+    expect(list.className).toContain('drop-root')
+    fireEvent.pointerUp(list, { pointerId: 2 })
+    await settle()
+    expect((settings.polyboxLinks as { url: string; folder?: string }[]).find(link => link.url === SHARE)?.folder).toBeUndefined()
+  })
+
+  it('nests folders at most three deep and removing one keeps its subjects', async () => {
+    const settings: Record<string, unknown> = {
+      polyboxLinks: [{ name: 'Analysis I', url: SHARE, folder: 'f-cccccccc' }],
+      polyboxFolders: [{ id: 'f-aaaaaaaa', name: 'A' }, { id: 'f-bbbbbbbb', name: 'B', parent: 'f-aaaaaaaa' }, { id: 'f-cccccccc', name: 'C', parent: 'f-bbbbbbbb' }]
+    }
+    const { container, menus, choose } = harness('panel', settings)
+    await settle()
+    expect([...container.querySelectorAll<HTMLElement>('[data-row]')].map(row => `${row.style.getPropertyValue('--pbx-depth')}:${row.textContent}`)).toEqual(['0:A1', '1:B1', '2:C1', '3:Analysis I'])
+    choose(null)
+    fireEvent.contextMenu(container.querySelector('[data-id="f-cccccccc"]')!)
+    await settle()
+    expect(menus.at(-1)!.find(item => item.id === 'sub')).toMatchObject({ enabled: false })
+    choose('delete')
+    fireEvent.contextMenu(container.querySelector('[data-id="f-bbbbbbbb"]')!)
+    await settle()
+    expect(settings.polyboxFolders).toEqual([{ id: 'f-aaaaaaaa', name: 'A' }, { id: 'f-cccccccc', name: 'C', parent: 'f-aaaaaaaa' }])
+    expect(settings.polyboxLinks).toEqual([{ name: 'Analysis I', url: SHARE, folder: 'f-cccccccc' }])
   })
 })

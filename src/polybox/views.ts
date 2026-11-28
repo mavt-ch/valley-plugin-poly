@@ -12,6 +12,7 @@ import {
   MAX_LINKS, POLYBOX_INSTANCE, linksOf, parsePasted, shareToken, sharePageUrl, sortFiles, sortOf, subjectInstance, subjectOf,
   type PolyboxFile, type PolyboxLink, type SortKey
 } from './model'
+import { canNest, folderOfLink, foldersOf, isFolderId, moveFolder, moveLink, newFolderId, removeFolder, treeRows, MAX_FOLDER_NAME, type Drop, type PolyboxFolder, type TreeRow } from './tree'
 
 type Shapes = string[]
 /** Two clouds, the larger one in front (27 Nov, drawn from the user's picture of clouds on a blue sky). */
@@ -30,6 +31,8 @@ const SLASH: Shapes = ['M14.5 5l-5 14']
 const ARROW_UP: Shapes = ['M12 19V5', 'M6 11l6-6 6 6']
 const ARROW_DOWN: Shapes = ['M12 5v14', 'M6 13l6 6 6-6']
 const FOLDER: Shapes = ['M3.5 7a1.5 1.5 0 0 1 1.5-1.5h4l2 2h8a1.5 1.5 0 0 1 1.5 1.5v8.5A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5z']
+const FOLDER_OPEN: Shapes = ['M3.5 17V7a1.5 1.5 0 0 1 1.5-1.5h4l2 2h7a1.5 1.5 0 0 1 1.5 1.5v1.5', 'M3.5 17.5l2.3-6.4a1.5 1.5 0 0 1 1.4-1h12.6a.9.9 0 0 1 .85 1.2l-2.1 6.2a1.5 1.5 0 0 1-1.4 1H5a1.5 1.5 0 0 1-1.5-1z']
+const FOLDER_PLUS: Shapes = [...['M3.5 7a1.5 1.5 0 0 1 1.5-1.5h4l2 2h8a1.5 1.5 0 0 1 1.5 1.5v8.5A1.5 1.5 0 0 1 19 19H5a1.5 1.5 0 0 1-1.5-1.5z'], 'M12 10.5v5', 'M9.5 13h5']
 const FILE: Shapes = ['M14 3.5H7A1.5 1.5 0 0 0 5.5 5v14A1.5 1.5 0 0 0 7 20.5h10a1.5 1.5 0 0 0 1.5-1.5V8z', 'M14 3.5V8h4.5']
 const PDF: Shapes = [...FILE, 'M8.5 13h7', 'M8.5 16.5h5']
 const GRID: Shapes = ['M4 5a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z', 'M13 5a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1z', 'M4 14a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z', 'M13 14a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-5a1 1 0 0 1-1-1z']
@@ -50,18 +53,30 @@ export const POLYBOX_CSS = `
 .pbx-add-bar .search-field-icon { display: grid; place-items: center; }
 .pbx-add-bar .search-field-icon svg { width: 14px; height: 14px; }
 .pbx-add-note { padding: 6px 12px; color: var(--tint-red-text, var(--text-secondary)); font-size: var(--smaller-font-size); border-bottom: 1px solid var(--border-light); }
-.pbx-list { flex: 1; min-height: 0; overflow-y: auto; }
-.pbx-row { display: grid; grid-template-columns: 15px minmax(0, 1fr); align-items: center; gap: 2px 10px; width: 100%; box-sizing: border-box; margin: 0; padding: 9px 12px 10px; border: 0; border-bottom: 1px solid var(--border-light); border-radius: 0; background: transparent; color: var(--text-color); font: inherit; text-align: left; cursor: pointer; transition: background-color 120ms ease-out; }
+/*
+ * The sidebar tree (28 Nov, on request: "a little bit more organized"): user folders up to three deep, open and closed
+ * folder glyphs, and compact 28px subject rows with only the cloud and the name. Rows drag to a new place.
+ */
+.pbx-list { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 0 12px; }
+.pbx-list.drop-root { box-shadow: inset 0 -2px 0 var(--accent-color); }
+.pbx-row { display: flex; align-items: center; gap: 7px; width: 100%; height: 28px; box-sizing: border-box; margin: 0; padding: 0 10px 0 calc(10px + var(--pbx-depth, 0) * 16px); border: 0; border-radius: 0; background: transparent; color: var(--text-color); font: inherit; text-align: left; cursor: pointer; user-select: none; touch-action: none; transition: background-color 120ms ease-out; }
 .pbx-row:hover { background: color-mix(in srgb, var(--title-color) 5%, transparent); }
 .pbx-row.active { background: var(--accent-tint-bg); }
 .pbx-row.active .pbx-row-name { color: var(--accent-color); }
 .pbx-row:focus-visible, .pbx-file:focus-visible, .pbx-crumb:focus-visible { outline: 2px solid var(--accent-color); outline-offset: -2px; }
-.pbx-row-icon { grid-row: 1 / 3; display: grid; place-items: center; color: var(--text-tertiary, var(--text-secondary)); }
+.pbx-row.dragging { opacity: 0.45; }
+.pbx-row.drop-before { box-shadow: inset 0 2px 0 var(--accent-color); }
+.pbx-row.drop-after { box-shadow: inset 0 -2px 0 var(--accent-color); }
+.pbx-row.drop-into { background: var(--accent-tint-bg); box-shadow: inset 0 0 0 1px var(--accent-color); }
+.pbx-row-icon { display: grid; place-items: center; flex-shrink: 0; color: var(--text-tertiary, var(--text-secondary)); }
 .pbx-row-icon svg { width: 15px; height: 15px; }
-.pbx-row-name { min-width: 0; color: var(--title-color); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pbx-row-name.pending { color: var(--text-tertiary, var(--text-secondary)); font-weight: 400; }
-.pbx-row-meta { min-width: 0; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pbx-rename { width: 100%; min-width: 0; box-sizing: border-box; height: 22px; margin: -2px 0; padding: 0 4px; border: 1px solid var(--accent-color); border-radius: 3px; outline: 0; background: var(--background-color, transparent); color: var(--title-color); font: inherit; font-weight: 600; }
+.pbx-row.folder .pbx-row-icon { color: var(--text-secondary); }
+.pbx-row-name { flex: 1; min-width: 0; color: var(--text-color); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pbx-row.folder .pbx-row-name { color: var(--title-color); font-weight: 600; }
+.pbx-row-name.pending { color: var(--text-tertiary, var(--text-secondary)); }
+.pbx-row-count { flex-shrink: 0; color: var(--text-tertiary, var(--text-secondary)); font-size: var(--smaller-font-size); font-variant-numeric: tabular-nums; }
+.pbx-rename { flex: 1; width: 100%; min-width: 0; box-sizing: border-box; height: 22px; margin: 0; padding: 0 4px; border: 1px solid var(--accent-color); border-radius: 3px; outline: 0; background: var(--background-color, transparent); color: var(--title-color); font: inherit; }
+.pbx-add-bar .poly-icon-btn { flex-shrink: 0; }
 @media (prefers-reduced-motion: reduce) { .pbx-row, .pbx-file { transition: none; } }
 .pbx-empty { padding: 14px 12px; color: var(--text-secondary); font-size: var(--small-font-size); line-height: 1.45; }
 /*
@@ -223,7 +238,7 @@ export function createPolyboxViews(api: ValleyPluginApi, t: (key: string) => str
   }
 
   /** The paste field: Enter or a paste adds every share link in the text. */
-  function AddBar(): Node {
+  function AddBar({ extra }: { extra?: Node }): Node {
     const [value, setValue] = React.useState('')
     const [note, setNote] = React.useState('')
     const submit = (text: string) => {
@@ -244,15 +259,168 @@ export function createPolyboxViews(api: ValleyPluginApi, t: (key: string) => str
               onPaste: (event: ClipboardEvent) => { const text = event.clipboardData?.getData('text/plain') ?? ''; if (!text.trim()) return; event.preventDefault(); submit(text) },
               onKeyDown: (event: KeyboardEvent) => { if (event.key === 'Enter') { event.preventDefault(); submit(value) } else if (event.key === 'Escape') { setValue(''); setNote('') } }
             }),
-            value ? h('button', { type: 'button', className: 'search-field-action', title: t('polybox.clear'), 'aria-label': t('polybox.clear'), onClick: () => { setValue(''); setNote('') } }, h(Icon, { shapes: CLOSE })) : null))),
+            value ? h('button', { type: 'button', className: 'search-field-action', title: t('polybox.clear'), 'aria-label': t('polybox.clear'), onClick: () => { setValue(''); setNote('') } }, h(Icon, { shapes: CLOSE })) : null)),
+        extra ?? null),
       note ? h('div', { className: 'pbx-add-note', role: 'alert' }, note) : null)
   }
 
-  function SubjectRow({ link, index, active, renaming, setRenaming }: { link: PolyboxLink; index: number; active: boolean; renaming: boolean; setRenaming: (index: number | null) => void }): Node {
-    const token = shareToken(link.url)
-    const rename = (name: string) => { setRenaming(null); const links = readLinks(); if (links[index]?.url === link.url && name.trim() !== link.name) save(links.map((row, i) => i === index ? { ...row, name: name.trim() } : row)) }
-    const menu = async (event: MouseEvent) => {
+  const readFolders = () => foldersOf(api.settings.get().polyboxFolders)
+  const saveFolders = (folders: PolyboxFolder[]) => void api.settings.set('polyboxFolders', foldersOf(folders))
+  const readCollapsed = (): Set<string> => { const raw = api.settings.get().polyboxCollapsed; return new Set(Array.isArray(raw) ? raw.filter(isFolderId) : []) }
+  const setCollapsed = (ids: Set<string>) => { const known = new Set(readFolders().map(folder => folder.id)); void api.settings.set('polyboxCollapsed', [...ids].filter(id => known.has(id))) }
+  const toggleFolder = (id: string, open?: boolean) => { const ids = readCollapsed(); if (open ?? ids.has(id)) ids.delete(id); else ids.add(id); setCollapsed(ids) }
+  /** A new folder, at the top level or inside `parent` (never below the third level), opened and named in place. */
+  const createFolder = (parent?: string): string | null => {
+    const folders = readFolders()
+    if (parent && !canNest(folders, parent)) return null
+    const id = newFolderId()
+    saveFolders([...folders, { id, name: t('polybox.folder.new'), ...(parent ? { parent } : {}) }])
+    if (parent) toggleFolder(parent, true)
+    return id
+  }
+  /** Removing a folder keeps everything in it: its subfolders and subjects move up one level. */
+  const deleteFolder = (id: string) => {
+    const next = removeFolder(readFolders(), readLinks(), id)
+    saveFolders(next.folders)
+    save(next.links)
+  }
+  const renameFolder = (id: string, name: string) => {
+    const folders = readFolders()
+    const clean = name.trim().slice(0, MAX_FOLDER_NAME)
+    if (clean && folders.some(folder => folder.id === id && folder.name !== clean)) saveFolders(folders.map(folder => folder.id === id ? { ...folder, name: clean } : folder))
+  }
+  const renameLink = (url: string, name: string) => {
+    const links = readLinks()
+    if (links.some(link => link.url === url && link.name !== name.trim())) save(links.map(link => link.url === url ? { ...link, name: name.trim() } : link))
+  }
+  type Moving = { kind: 'folder' | 'link'; id: string }
+  /** Applies a drop; false when it is not allowed (a folder into itself or below the third level). */
+  const applyDrop = (moving: Moving, drop: Drop): boolean => {
+    if (moving.kind === 'link') { save(moveLink(readLinks(), readFolders(), moving.id, drop)); if (drop.place === 'into' && drop.target.kind === 'folder') toggleFolder(drop.target.id, true); return true }
+    const next = moveFolder(readFolders(), readLinks(), moving.id, drop)
+    if (!next) return false
+    saveFolders(next)
+    if (drop.place === 'into' && drop.target.kind === 'folder') toggleFolder(drop.target.id, true)
+    return true
+  }
+  const allowed = (moving: Moving, drop: Drop) => moving.kind === 'link' || moveFolder(readFolders(), readLinks(), moving.id, drop) !== null
+  const rowKey = (row: TreeRow) => row.kind === 'folder' ? `f:${row.folder.id}` : `l:${row.link.url}`
+
+  function RenameField({ value, placeholder, onDone }: { value: string; placeholder: string; onDone: (name: string | null) => void }): Node {
+    return h('input', {
+      className: 'pbx-rename', defaultValue: value, placeholder, autoFocus: true, maxLength: 200, 'aria-label': t('polybox.rename'),
+      onFocus: (event: FocusEvent) => (event.target as HTMLInputElement).select(),
+      onClick: (event: MouseEvent) => event.stopPropagation(),
+      onPointerDown: (event: PointerEvent) => event.stopPropagation(),
+      onKeyDown: (event: KeyboardEvent) => { event.stopPropagation(); if (event.key === 'Enter') onDone((event.target as HTMLInputElement).value); if (event.key === 'Escape') onDone(null) },
+      onBlur: (event: FocusEvent) => onDone((event.target as HTMLInputElement).value)
+    })
+  }
+
+  /**
+   * The sidebar: the paste field with a New folder button, then the tree. A row drags with the pointer (4px threshold):
+   * on a folder's upper or lower quarter it lands before or after it, in between it goes into it; on a subject before or
+   * after it; below the last row at the top level. Option/Alt + ↑/↓ moves the focused row among its siblings.
+   */
+  function PolyboxPanelBody(): Node {
+    const links = useLinks()
+    const folders = readFolders()
+    const collapsed = readCollapsed()
+    const rows = treeRows(folders, links, collapsed)
+    const open = useActiveInstance()
+    const [renaming, setRenaming] = React.useState<string | null>(null)
+    const [drag, setDrag] = React.useState<{ moving: Moving; drop: Drop | null } | null>(null)
+    const listRef = React.useRef<HTMLDivElement | null>(null)
+    const pending = React.useRef<{ moving: Moving; x: number; y: number; pointerId: number; active: boolean; drop: Drop | null } | null>(null)
+    const suppressClick = React.useRef(false)
+
+    const newFolder = (parent?: string) => { const id = createFolder(parent); if (id) setRenaming(`f:${id}`) }
+    const dropAt = (y: number, moving: Moving): Drop | null => {
+      const list = listRef.current
+      if (!list) return null
+      const elements = [...list.querySelectorAll<HTMLElement>('[data-row]')]
+      for (const element of elements) {
+        const rect = element.getBoundingClientRect()
+        if (y < rect.top || y >= rect.bottom) continue
+        const ratio = rect.height ? (y - rect.top) / rect.height : 0.5
+        const kind = element.dataset.row
+        const id = element.dataset.id ?? ''
+        const drop: Drop = kind === 'folder'
+          ? { place: ratio < 0.25 ? 'before' : ratio > 0.75 && !(element.dataset.open === 'true' && element.dataset.empty !== 'true') ? 'after' : 'into', target: { kind: 'folder', id } }
+          : { place: ratio < 0.5 ? 'before' : 'after', target: { kind: 'link', url: id } }
+        if (drop.target.kind === moving.kind && (drop.target.kind === 'folder' ? drop.target.id : drop.target.url) === moving.id) return null
+        return allowed(moving, drop) ? drop : null
+      }
+      const last = elements.at(-1)
+      if (last && y >= last.getBoundingClientRect().bottom) { const drop: Drop = { place: 'into', target: { kind: 'root' } }; return allowed(moving, drop) ? drop : null }
+      return null
+    }
+    const onPointerDown = (event: PointerEvent, moving: Moving) => {
+      if (event.button !== 0 || renaming) return
+      pending.current = { moving, x: event.clientX, y: event.clientY, pointerId: event.pointerId, active: false, drop: null }
+    }
+    const onPointerMove = (event: PointerEvent) => {
+      const state = pending.current
+      if (!state || state.pointerId !== event.pointerId) return
+      if (!state.active) {
+        if (Math.hypot(event.clientX - state.x, event.clientY - state.y) < 4) return
+        state.active = true
+        try { listRef.current?.setPointerCapture(event.pointerId) } catch { /* the pointer may already be gone */ }
+      }
+      state.drop = dropAt(event.clientY, state.moving)
+      setDrag({ moving: state.moving, drop: state.drop })
+    }
+    const finish = (event: PointerEvent, apply: boolean) => {
+      const state = pending.current
+      if (!state || state.pointerId !== event.pointerId) return
+      pending.current = null
+      if (!state.active) return
+      suppressClick.current = true
+      setTimeout(() => { suppressClick.current = false }, 0)
+      try { listRef.current?.releasePointerCapture(event.pointerId) } catch { /* released already */ }
+      setDrag(null)
+      if (apply && state.drop) applyDrop(state.moving, state.drop)
+    }
+    /** Option/Alt + ↑/↓: the row trades places with its neighbour of the same kind and level. */
+    const stepRow = (event: KeyboardEvent, row: TreeRow) => {
+      if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
       event.preventDefault()
+      const up = event.key === 'ArrowUp'
+      if (row.kind === 'folder') {
+        const siblings = folders.filter(folder => folder.parent === row.folder.parent)
+        const neighbour = siblings[siblings.findIndex(folder => folder.id === row.folder.id) + (up ? -1 : 1)]
+        if (neighbour) applyDrop({ kind: 'folder', id: row.folder.id }, { place: up ? 'before' : 'after', target: { kind: 'folder', id: neighbour.id } })
+      } else {
+        const here = folderOfLink(row.link, folders)
+        const siblings = links.filter(link => folderOfLink(link, folders) === here)
+        const neighbour = siblings[siblings.findIndex(link => link.url === row.link.url) + (up ? -1 : 1)]
+        if (neighbour) applyDrop({ kind: 'link', id: row.link.url }, { place: up ? 'before' : 'after', target: { kind: 'link', url: neighbour.url } })
+      }
+      queueMicrotask(() => listRef.current?.querySelector<HTMLElement>(`[data-key="${CSS.escape(rowKey(row))}"]`)?.focus())
+    }
+    const dropClass = (row: TreeRow) => {
+      const drop = drag?.drop
+      if (!drop || drop.target.kind === 'root') return ''
+      const hit = drop.target.kind === 'folder' ? row.kind === 'folder' && row.folder.id === drop.target.id : row.kind === 'link' && row.link.url === drop.target.url
+      return hit ? ` drop-${drop.place}` : ''
+    }
+    const isDragged = (row: TreeRow) => drag !== null && (row.kind === 'folder' ? drag.moving.kind === 'folder' && drag.moving.id === row.folder.id : drag.moving.kind === 'link' && drag.moving.id === row.link.url)
+
+    const folderMenu = async (event: MouseEvent, folder: PolyboxFolder) => {
+      event.preventDefault(); event.stopPropagation()
+      const choice = await api.ui.openMenu([
+        { id: 'sub', label: t('polybox.folder.newInside'), icon: h(Icon, { shapes: FOLDER_PLUS }), enabled: canNest(folders, folder.id) },
+        { type: 'separator' },
+        { id: 'rename', label: t('polybox.rename'), icon: h(Icon, { shapes: PEN }) },
+        { id: 'delete', label: t('polybox.folder.delete'), icon: h(Icon, { shapes: TRASH }) }
+      ], { x: event.clientX, y: event.clientY })
+      if (choice === 'sub') newFolder(folder.id)
+      if (choice === 'rename') setRenaming(`f:${folder.id}`)
+      if (choice === 'delete') deleteFolder(folder.id)
+    }
+    const linkMenu = async (event: MouseEvent, link: PolyboxLink) => {
+      event.preventDefault(); event.stopPropagation()
+      const token = shareToken(link.url)
       const choice = await api.ui.openMenu([
         { id: 'tab', label: t('polybox.openInNewTab'), icon: h(Icon, { shapes: TAB }), enabled: Boolean(token) },
         { id: 'website', label: t('polybox.openWebsite'), icon: h(Icon, { shapes: OPEN }), enabled: Boolean(token) },
@@ -262,39 +430,62 @@ export function createPolyboxViews(api: ValleyPluginApi, t: (key: string) => str
       ], { x: event.clientX, y: event.clientY })
       if (choice === 'tab') openSubject(link, true)
       if (choice === 'website' && token) void api.links.open(sharePageUrl(token))
-      if (choice === 'rename') setRenaming(index)
+      if (choice === 'rename') setRenaming(`l:${link.url}`)
       if (choice === 'remove') remove(link)
     }
-    const name = renaming
-      ? h('input', {
-        className: 'pbx-rename', defaultValue: link.name || '', placeholder: subjectName(link), autoFocus: true, maxLength: 200, 'aria-label': t('polybox.rename'),
-        onClick: (event: MouseEvent) => event.stopPropagation(),
-        onKeyDown: (event: KeyboardEvent) => { event.stopPropagation(); if (event.key === 'Enter') rename((event.target as HTMLInputElement).value); if (event.key === 'Escape') setRenaming(null) },
-        onBlur: (event: FocusEvent) => rename((event.target as HTMLInputElement).value)
-      })
-      : h('span', { className: `pbx-row-name${link.name ? '' : ' pending'}` }, subjectName(link))
-    return h(renaming ? 'div' : 'button', {
-      type: renaming ? undefined : 'button', className: `pbx-row${active ? ' active' : ''}`, 'data-subject': token ?? '', 'aria-current': active ? 'page' : undefined,
-      onClick: renaming ? undefined : (event: MouseEvent) => openSubject(link, api.ui.hasModKey(event)),
-      onAuxClick: (event: MouseEvent) => { if (event.button === 1 && !renaming) { event.preventDefault(); openSubject(link, true) } },
-      onDoubleClick: renaming ? undefined : () => setRenaming(index),
-      onContextMenu: renaming ? undefined : (event: MouseEvent) => void menu(event)
-    },
-    h('span', { className: 'pbx-row-icon' }, h(Icon, { shapes: POLYBOX_ICON })),
-    name,
-    h('span', { className: 'pbx-row-meta' }, token ? `polybox.ethz.ch · ${token}` : t('polybox.invalid')))
-  }
+    const listMenu = async (event: MouseEvent) => {
+      event.preventDefault()
+      const choice = await api.ui.openMenu([{ id: 'folder', label: t('polybox.folder.new'), icon: h(Icon, { shapes: FOLDER_PLUS }) }], { x: event.clientX, y: event.clientY })
+      if (choice === 'folder') newFolder()
+    }
 
-  /** The sidebar: the paste field, then one row per subject. */
-  function PolyboxPanelBody(): Node {
-    const links = useLinks()
-    const open = useActiveInstance()
-    const [renaming, setRenaming] = React.useState<number | null>(null)
+    const renderRow = (row: TreeRow): Node => {
+      const key = rowKey(row)
+      const editing = renaming === key
+      const common = {
+        key, 'data-key': key, 'data-row': row.kind, style: { '--pbx-depth': row.depth } as Record<string, unknown>,
+        onPointerDown: (event: PointerEvent) => onPointerDown(event, row.kind === 'folder' ? { kind: 'folder', id: row.folder.id } : { kind: 'link', id: row.link.url }),
+        onKeyDown: (event: KeyboardEvent) => { if (!editing) stepRow(event, row) }
+      }
+      if (row.kind === 'folder') {
+        const { folder } = row
+        return h(editing ? 'div' : 'button', {
+          ...common, type: editing ? undefined : 'button', className: `pbx-row folder${isDragged(row) ? ' dragging' : ''}${dropClass(row)}`,
+          'data-id': folder.id, 'data-open': String(row.open), 'data-empty': String(!folders.some(f => f.parent === folder.id) && !links.some(link => folderOfLink(link, folders) === folder.id)),
+          'aria-expanded': row.open,
+          onClick: editing ? undefined : () => { if (!suppressClick.current) toggleFolder(folder.id) },
+          onDoubleClick: editing ? undefined : () => setRenaming(key),
+          onContextMenu: editing ? undefined : (event: MouseEvent) => void folderMenu(event, folder)
+        },
+        h('span', { className: 'pbx-row-icon' }, h(Icon, { shapes: row.open ? FOLDER_OPEN : FOLDER })),
+        editing ? h(RenameField, { value: folder.name, placeholder: t('polybox.folder.new'), onDone: name => { setRenaming(null); if (name !== null) renameFolder(folder.id, name) } })
+          : h('span', { className: 'pbx-row-name' }, folder.name || t('polybox.untitled')),
+        editing || !row.count ? null : h('span', { className: 'pbx-row-count' }, row.count))
+      }
+      const { link } = row
+      const token = shareToken(link.url)
+      const active = Boolean(token) && open === subjectInstance(token!)
+      return h(editing ? 'div' : 'button', {
+        ...common, type: editing ? undefined : 'button', className: `pbx-row${active ? ' active' : ''}${isDragged(row) ? ' dragging' : ''}${dropClass(row)}`,
+        'data-id': link.url, 'data-subject': token ?? '', 'aria-current': active ? 'page' : undefined,
+        title: token ? `${subjectName(link)} · polybox.ethz.ch/s/${token}` : t('polybox.invalid'),
+        onClick: editing ? undefined : (event: MouseEvent) => { if (!suppressClick.current) openSubject(link, api.ui.hasModKey(event)) },
+        onAuxClick: (event: MouseEvent) => { if (event.button === 1 && !editing) { event.preventDefault(); openSubject(link, true) } },
+        onDoubleClick: editing ? undefined : () => setRenaming(key),
+        onContextMenu: editing ? undefined : (event: MouseEvent) => void linkMenu(event, link)
+      },
+      h('span', { className: 'pbx-row-icon' }, h(Icon, { shapes: POLYBOX_ICON })),
+      editing ? h(RenameField, { value: link.name || '', placeholder: subjectName(link), onDone: name => { setRenaming(null); if (name !== null) renameLink(link.url, name) } })
+        : h('span', { className: `pbx-row-name${link.name ? '' : ' pending'}` }, subjectName(link)))
+    }
+
     return h(React.Fragment, null,
-      h(AddBar, null),
-      h('div', { className: 'pbx-list' }, links.length
-        ? links.map((link, index) => h(SubjectRow, { key: link.url, link, index, active: Boolean(shareToken(link.url)) && open === subjectInstance(shareToken(link.url)!), renaming: renaming === index, setRenaming }))
-        : h('div', { className: 'pbx-empty' }, t('polybox.empty'))))
+      h(AddBar, { extra: h('button', { type: 'button', className: 'poly-icon-btn', title: t('polybox.folder.new'), 'aria-label': t('polybox.folder.new'), onClick: () => newFolder() }, h(Icon, { shapes: FOLDER_PLUS })) }),
+      h('div', {
+        ref: listRef, className: `pbx-list${drag?.drop?.target.kind === 'root' ? ' drop-root' : ''}`, role: 'tree', 'aria-label': t('polybox.title'),
+        onPointerMove, onPointerUp: (event: PointerEvent) => finish(event, true), onPointerCancel: (event: PointerEvent) => finish(event, false),
+        onContextMenu: (event: MouseEvent) => { if (event.target === listRef.current) void listMenu(event) }
+      }, rows.length ? rows.map(renderRow) : h('div', { className: 'pbx-empty' }, t('polybox.empty'))))
   }
 
   /** Listings read once stay in memory, so going back up a folder shows it at once; Refresh reads past them. */

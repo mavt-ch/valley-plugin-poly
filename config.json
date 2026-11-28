@@ -348,8 +348,66 @@
               "url": {
                 "type": "string",
                 "maxLength": 2000
+              },
+              "folder": {
+                "type": "string",
+                "maxLength": 40
               }
             }
+          }
+        }
+      },
+      {
+        "key": "polyboxFolders",
+        "label": "Polybox folders",
+        "labelKey": "polybox.settings.folders.title",
+        "type": "custom",
+        "settingsVisible": false,
+        "default": [],
+        "description": "The folders of the Polybox sidebar, at most three deep.",
+        "descriptionKey": "polybox.settings.folders.description",
+        "schema": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "name"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "name": {
+                "type": "string",
+                "maxLength": 120
+              },
+              "parent": {
+                "type": "string",
+                "maxLength": 40
+              }
+            }
+          }
+        }
+      },
+      {
+        "key": "polyboxCollapsed",
+        "label": "Closed Polybox folders",
+        "labelKey": "polybox.settings.collapsed.title",
+        "type": "custom",
+        "settingsVisible": false,
+        "default": [],
+        "description": "The Polybox sidebar folders that are closed.",
+        "descriptionKey": "polybox.settings.collapsed.description",
+        "schema": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "type": "string",
+            "maxLength": 40
           }
         }
       },

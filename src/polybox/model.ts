@@ -1,7 +1,7 @@
 import { decodeEntities } from '../news/model'
 
-/** One row of the Polybox table: a subject and its Polybox share link. */
-export type PolyboxLink = { name: string; url: string }
+/** One row of the Polybox table: a subject and its Polybox share link, optionally in a sidebar folder (`tree.ts`). */
+export type PolyboxLink = { name: string; url: string; folder?: string }
 
 /** One file or folder of a share, as the backend lists it. */
 /** `created` is when the file was added to Polybox (Nextcloud's upload time); folders and older files have none. */
@@ -85,9 +85,9 @@ export function linksOf(value: unknown): PolyboxLink[] {
   if (!Array.isArray(value)) return []
   return value.flatMap(item => {
     if (!item || typeof item !== 'object') return []
-    const { name, url } = item as Record<string, unknown>
+    const { name, url, folder } = item as Record<string, unknown>
     if (typeof name !== 'string' || typeof url !== 'string') return []
-    const row = { name: name.trim().slice(0, MAX_NAME), url: url.trim().slice(0, MAX_URL) }
+    const row: PolyboxLink = { name: name.trim().slice(0, MAX_NAME), url: url.trim().slice(0, MAX_URL), ...(typeof folder === 'string' && /^f-[a-z0-9]{6,32}$/.test(folder) ? { folder } : {}) }
     return row.name || row.url ? [row] : []
   }).slice(0, MAX_LINKS)
 }

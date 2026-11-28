@@ -324,5 +324,12 @@
   "polybox.sort.asc": "Trier par {column}, ordre croissant",
   "polybox.sort.desc": "Trier par {column}, ordre décroissant",
   "polybox.settings.sort.title": "Tri Polybox",
-  "polybox.settings.sort.description": "La colonne selon laquelle un dossier Polybox est trié, en ordre croissant ou décroissant ; les dossiers restent en tête."
+  "polybox.settings.sort.description": "La colonne selon laquelle un dossier Polybox est trié, en ordre croissant ou décroissant ; les dossiers restent en tête.",
+  "polybox.folder.new": "Nouveau dossier",
+  "polybox.folder.newInside": "Nouveau dossier à l’intérieur",
+  "polybox.folder.delete": "Supprimer le dossier",
+  "polybox.settings.folders.title": "Dossiers Polybox",
+  "polybox.settings.folders.description": "Les dossiers de la barre latérale Polybox, sur trois niveaux au plus.",
+  "polybox.settings.collapsed.title": "Dossiers Polybox fermés",
+  "polybox.settings.collapsed.description": "Les dossiers fermés de la barre latérale Polybox."
 }

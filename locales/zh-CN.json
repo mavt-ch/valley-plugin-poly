@@ -324,5 +324,12 @@
   "polybox.sort.asc": "按{column}升序排序",
   "polybox.sort.desc": "按{column}降序排序",
   "polybox.settings.sort.title": "Polybox 排序",
-  "polybox.settings.sort.description": "Polybox 文件夹按哪一列升序或降序排序；文件夹始终在前。"
+  "polybox.settings.sort.description": "Polybox 文件夹按哪一列升序或降序排序；文件夹始终在前。",
+  "polybox.folder.new": "新建文件夹",
+  "polybox.folder.newInside": "在其中新建文件夹",
+  "polybox.folder.delete": "删除文件夹",
+  "polybox.settings.folders.title": "Polybox 文件夹",
+  "polybox.settings.folders.description": "Polybox 侧边栏的文件夹，最多三层。",
+  "polybox.settings.collapsed.title": "已关闭的 Polybox 文件夹",
+  "polybox.settings.collapsed.description": "Polybox 侧边栏中已关闭的文件夹。"
 }

@@ -324,5 +324,12 @@
   "polybox.sort.asc": "Ordenar por {column}, ascendente",
   "polybox.sort.desc": "Ordenar por {column}, descendente",
   "polybox.settings.sort.title": "Orden de Polybox",
-  "polybox.settings.sort.description": "La columna por la que se ordena una carpeta de Polybox, ascendente o descendente; las carpetas quedan primero."
+  "polybox.settings.sort.description": "La columna por la que se ordena una carpeta de Polybox, ascendente o descendente; las carpetas quedan primero.",
+  "polybox.folder.new": "Nueva carpeta",
+  "polybox.folder.newInside": "Nueva carpeta dentro",
+  "polybox.folder.delete": "Eliminar carpeta",
+  "polybox.settings.folders.title": "Carpetas de Polybox",
+  "polybox.settings.folders.description": "Las carpetas de la barra lateral de Polybox, con tres niveles como máximo.",
+  "polybox.settings.collapsed.title": "Carpetas de Polybox cerradas",
+  "polybox.settings.collapsed.description": "Las carpetas cerradas de la barra lateral de Polybox."
 }
